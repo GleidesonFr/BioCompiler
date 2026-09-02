@@ -91,7 +91,7 @@ O frontend pode ser criado no Render como um **Web Service** usando ambiente Doc
 4. Garanta que essa variavel esteja disponivel durante o build, pois o Vite incorpora valores `VITE_*` no bundle.
 5. Use a porta fornecida pelo Render. O Dockerfile utiliza automaticamente `PORT` e assume `10000` como valor local.
 
-O backend deve ser publicado como outro **Web Service** Docker usando `backend/biocompiler/Dockerfile`. Configure `SPRING_DATASOURCE_URL` para `jdbc:sqlite:/app/data/biocompiler.db` e adicione um Persistent Disk montado em `/app/data`. O servico SQLite do Compose serve para o ambiente local; no Render, o arquivo SQLite deve ficar no disco persistente do backend.
+O backend deve ser publicado como outro **Web Service** Docker usando `backend/biocompiler/Dockerfile`. No Render, configure exatamente a variavel `SPRING_DATASOURCE_URL` com o valor `jdbc:sqlite:/app/data/biocompiler.db`; nao informe somente `/app/data/biocompiler.db`. Adicione um Persistent Disk montado em `/app/data`. O servico SQLite do Compose serve para o ambiente local; no Render, o arquivo SQLite deve ficar no disco persistente do backend.
 
 ## Executar sem Docker
 
