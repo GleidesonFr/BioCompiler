@@ -1,0 +1,44 @@
+services:
+  sqlite:
+    build:
+      context: ./database/sqlite
+      dockerfile: Dockerfile
+    container_name: biocompiler-sqlite
+    volumes:
+      - sqlite-data:/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend/biocompiler
+      dockerfile: Dockerfile
+    container_name: biocompiler-backend
+    depends_on:
+      - sqlite
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:sqlite:/app/data/biocompiler.db
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_PORT: 8080
+    volumes:
+      - sqlite-data:/app/data
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend/biocompiler
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    container_name: biocompiler-frontend
+    depends_on:
+      - backend
+    environment:
+      PORT: 5173
+    ports:
+      - "5173:5173"
+    restart: unless-stopped
+
+volumes:
+  sqlite-data:

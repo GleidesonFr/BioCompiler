@@ -1,0 +1,9 @@
+node_modules
+.output
+.wrangler
+dist
+.git
+.gitignore
+.vscode
+.idea
+*.log
