@@ -60,7 +60,7 @@ public class DNAAnalysisService {
         analysis.setPositionStart(startCodon.getPosition());
         analysis.setReadingFrame(startCodon.getReadingFrame());
 
-        if(frameShiftDetectorService.isFrameShift(sequence)){
+        if(frameShiftDetectorService.isFrameShift(sequence, startCodon.getPosition())){
             analysis.setResultType(ResultType.FRAME_SHIFT);
             return finishAnalysis(analysis, ResultType.FRAME_SHIFT);
         }

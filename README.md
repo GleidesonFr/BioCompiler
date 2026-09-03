@@ -1,6 +1,6 @@
 # BioCompiler 1.0
 
-O BioCompiler e uma aplicacao web para analise de sequencias de DNA. Ele combina uma interface visual para estudantes e pesquisadores de Biologia com uma API REST e persistencia local para quem desenvolve, testa ou estende o sistema.
+O BioCompiler e uma aplicacao web e terminal para analise de sequencias de DNA. Ele combina uma interface visual para estudantes e pesquisadores de Biologia com uma API REST, persistencia local e uma CLI para uso em laboratorio, aulas e testes automatizados.
 
 ## Para quem trabalha com Biologia
 
@@ -13,7 +13,7 @@ Uma sequencia de DNA e analisada em trincas de nucleotideos, chamadas codons. O 
 - **Frameshift**: sequencias cuja quantidade de bases altera a separacao em trincas.
 - **Nonsense mutation**: presenca de um codon de parada prematuro durante a analise.
 
-A pagina de analise apresenta a sequencia, o pre-mRNA e a visualizacao dos codons. A pagina de historico mostra os resultados salvos, estatisticas por tipo e paginacao. Cada navegador possui uma sessao propria para que os historicos nao se misturem.
+A pagina de analise apresenta a sequencia, o pre-mRNA e a visualizacao dos codons com animacoes da leitura e da transcricao. A pagina de historico mostra os resultados salvos, estatisticas por tipo, paginacao, carregamento restrito a tabela e limpeza do historico. Cada navegador possui uma sessao propria para que os historicos nao se misturem.
 
 ## Para quem trabalha com Computacao
 
@@ -21,7 +21,7 @@ O projeto e dividido em tres servicos:
 
 - **Frontend**: React, TypeScript, Vite e TanStack Router. Porta `5173`.
 - **Backend**: Spring Boot, Java 25, Spring Web MVC, Spring Data JPA e Hibernate. Porta `8080`.
-- **Banco**: SQLite persistido em um volume Docker compartilhado.
+- **Banco**: SQLite persistido em um volume Docker compartilhado no ambiente local.
 
 O backend recebe a sequencia, executa as regras de analise, salva o resultado e oferece endpoints para consulta detalhada, historico, estatisticas e limpeza do historico. O `sessionId` e gerado no frontend e armazenado em `sessionStorage`, sendo enviado nas requisicoes relacionadas ao historico.
 
@@ -30,9 +30,9 @@ O backend recebe a sequencia, executa as regras de analise, salva o resultado e 
 ```text
 backend/biocompiler/       API Spring Boot e testes
 frontend/biocompiler/      Interface React/TypeScript
-database/sqlite/            Imagem do servico SQLite
-docker-compose.yml         Orquestracao dos servicos
-docs/                      Documentacao complementar
+database/sqlite/            Imagem do servico SQLite local
+docker-compose.yml          Orquestracao dos servicos
+frontend/INTEGRACAO_*.md    Documentacao de integracao da API
 ```
 
 ## Requisitos
@@ -81,6 +81,8 @@ O banco fica no volume `biocompiler_sqlite-data`. Para remover tambem os dados p
 docker compose down -v
 ```
 
+O Compose usa a porta `8080` para o backend e `5173` para o frontend. O primeiro acesso pode demorar enquanto as imagens sao construidas e o Spring Boot inicializa.
+
 ## Deploy no Render
 
 O frontend pode ser criado no Render como um **Web Service** usando ambiente Docker:
@@ -91,7 +93,15 @@ O frontend pode ser criado no Render como um **Web Service** usando ambiente Doc
 4. Garanta que essa variavel esteja disponivel durante o build, pois o Vite incorpora valores `VITE_*` no bundle.
 5. Use a porta fornecida pelo Render. O Dockerfile utiliza automaticamente `PORT` e assume `10000` como valor local.
 
-O backend deve ser publicado como outro **Web Service** Docker usando `backend/biocompiler/Dockerfile`. No Render, configure exatamente a variavel `SPRING_DATASOURCE_URL` com o valor `jdbc:sqlite:/app/data/biocompiler.db`; nao informe somente `/app/data/biocompiler.db`. Adicione um Persistent Disk montado em `/app/data`. O servico SQLite do Compose serve para o ambiente local; no Render, o arquivo SQLite deve ficar no disco persistente do backend.
+O backend deve ser publicado como outro **Web Service** Docker usando `backend/biocompiler/Dockerfile`. Para usar o plano gratuito, configure exatamente `SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/biocompiler.db` e nao adicione Persistent Disk. O SQLite funcionara normalmente durante a execucao do servico, mas o filesystem gratuito do Render e efemero: o historico pode ser apagado quando o servico reiniciar, dormir ou receber um novo deploy. O servico SQLite do Compose continua sendo usado apenas no ambiente local.
+
+Se a persistencia do historico for obrigatoria, sera necessario usar um banco externo com plano gratuito, como PostgreSQL. Isso exige adaptar o backend, o driver JDBC, o dialeto Hibernate e a configuracao do datasource; nao e preciso fazer essa migracao para colocar a versao atual no ar sem custo.
+
+### Configuracao do backend no Render
+
+O backend usa a porta informada pelo Render em `PORT`. Nao fixe `8080` no servico publicado; o container repassa automaticamente `PORT` para o Spring Boot.
+
+Para o frontend, `VITE_API_BASE_URL` e uma variavel de build. Depois que o frontend for construido, alterar essa variavel apenas no ambiente de execucao nao altera o bundle; e necessario iniciar um novo deploy.
 
 ## Executar sem Docker
 
@@ -133,6 +143,19 @@ No PowerShell:
 $env:VITE_API_BASE_URL = "http://localhost:8080"
 npm run dev
 ```
+
+### CLI do backend
+
+O backend tambem possui um modo interativo para analise pelo terminal. Ele e ativado pelo profile `terminal` e nao inicia o servidor web:
+
+```powershell
+cd backend/biocompiler
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=terminal"
+```
+
+No menu da CLI, e possivel analisar uma sequencia individual, processar um arquivo em lote, exibir o resumo por tipo de resultado e exportar os resultados para um arquivo delimitado por ponto e virgula, por padrao `resultados.txt`.
+
+O arquivo de entrada da CLI aceita uma sequencia por linha e pode ser usado com `.txt` ou `.csv`. A linha `entrada` ou `.entrada` e tratada como cabecalho e ignorada.
 
 ## Formatos de entrada
 

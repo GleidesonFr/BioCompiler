@@ -18,15 +18,12 @@ public class StopCodonService implements DetermineReadingFrameImpl{
     public List<StopCodon> findStopCodon(String sequence, int startPosition){
         List<StopCodon> stopCodons = new ArrayList<>();
         
-        for(int position = startPosition + 3; position <= sequence.length() - 3; position ++){
+        for(int position = startPosition + 3; position <= sequence.length() - 3; position += 3){
             String codon = sequence.substring(position, position + 3);
 
             if(isStopCodon(codon)){
                 ReadingFrame readingFrame = determineReadingFrame(position);
-
-                if(readingFrame == ReadingFrame.FRAME_0){
-                    stopCodons.add(new StopCodon(position, codon, readingFrame));
-                }
+                stopCodons.add(new StopCodon(position, codon, readingFrame));
             }
         }
 
