@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Download, LoaderCircle, Trash2 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { SeverityBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,7 @@ function Historico() {
     frameshift: 0,
     nonsense: 0,
   });
+  const [downloading, setDownloading] = useState(false);
   const { records, loading, error, refresh } = useHistory(page - 1, PAGE_SIZE);
   const navigate = useNavigate();
 
@@ -143,6 +144,17 @@ function Historico() {
     }
   };
 
+  const download = async () => {
+    setDownloading(true);
+    try {
+      await API.downloadHistory();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Não foi possível baixar os dados.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
   <div className="min-h-screen">
     <Navbar />
@@ -159,15 +171,26 @@ function Historico() {
           </p>
         </div>
 
-        {records.totalElements > 0 && (
+        <div className="flex flex-wrap gap-2">
           <Button
-            variant="brandOutline"
-            onClick={() => void clear()}
+            onClick={() => void download()}
+            disabled={downloading || records.totalElements === 0}
+            title={records.totalElements === 0 ? "Não há dados para baixar" : "Baixar todos os dados da sessão"}
+            className="bg-ok text-white shadow-[0_8px_24px_-10px_var(--ok)] hover:bg-ok/90"
           >
-            <Trash2 className="size-4" />
-            Limpar histórico
+            {downloading ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {downloading ? "Preparando..." : "Baixar dados"}
           </Button>
-        )}
+          {records.totalElements > 0 && (
+            <Button
+              variant="brandOutline"
+              onClick={() => void clear()}
+            >
+              <Trash2 className="size-4" />
+              Limpar histórico
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

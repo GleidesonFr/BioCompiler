@@ -60,6 +60,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
+function getDownloadFilename(response: Response, fallback: string): string {
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return match?.[1] ?? fallback;
+}
+
 export const API = {
   async analyzeSequence(sequence: string): Promise<BackendAnalysis> {
     const sessionId = getSessionId();
@@ -97,6 +103,28 @@ export const API = {
       headers: { Accept: "application/json" },
     });
     return parseResponse<HistoryStats>(response);
+  },
+
+  async downloadHistory(): Promise<void> {
+    const params = new URLSearchParams({ sessionId: getSessionId() });
+    const response = await fetch(`${API_BASE_URL}/api/analysis/history/export?${params}`, {
+      headers: { Accept: "text/plain" },
+    });
+
+    if (!response.ok) {
+      await parseResponse<unknown>(response);
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = getDownloadFilename(response, "resultados.txt");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   },
 
   async getAnalysis(id: string): Promise<BackendAnalysis> {

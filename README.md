@@ -21,7 +21,7 @@ O projeto e dividido em tres servicos:
 
 - **Frontend**: React, TypeScript, Vite e TanStack Router. Porta `5173`.
 - **Backend**: Spring Boot, Java 25, Spring Web MVC, Spring Data JPA e Hibernate. Porta `8080`.
-- **Banco**: SQLite persistido em um volume Docker compartilhado no ambiente local.
+- **Banco**: PostgreSQL em container no ambiente local e configurável por variáveis de ambiente no deploy.
 
 O backend recebe a sequencia, executa as regras de analise, salva o resultado e oferece endpoints para consulta detalhada, historico, estatisticas e limpeza do historico. O `sessionId` e gerado no frontend e armazenado em `sessionStorage`, sendo enviado nas requisicoes relacionadas ao historico.
 
@@ -30,7 +30,7 @@ O backend recebe a sequencia, executa as regras de analise, salva o resultado e 
 ```text
 backend/biocompiler/       API Spring Boot e testes
 frontend/biocompiler/      Interface React/TypeScript
-database/sqlite/            Imagem do servico SQLite local
+database/sqlite/            Artefatos legados do banco local
 docker-compose.yml          Orquestracao dos servicos
 frontend/INTEGRACAO_*.md    Documentacao de integracao da API
 ```
@@ -75,7 +75,7 @@ Para parar os containers sem apagar os dados:
 docker compose down
 ```
 
-O banco fica no volume `biocompiler_sqlite-data`. Para remover tambem os dados persistidos:
+O banco fica no volume `biocompiler_postgres-data`. Para remover tambem os dados persistidos:
 
 ```bash
 docker compose down -v
@@ -85,23 +85,17 @@ O Compose usa a porta `8080` para o backend e `5173` para o frontend. O primeiro
 
 ## Deploy no Render
 
-O frontend pode ser criado no Render como um **Web Service** usando ambiente Docker:
+O repositório inclui um Blueprint em [render.yaml](render.yaml), que cria três recursos na mesma região:
 
-1. Selecione este repositorio e defina o caminho do Dockerfile como `frontend/biocompiler/Dockerfile`.
-2. Defina o diretorio de contexto como `frontend/biocompiler`.
-3. Configure `VITE_API_BASE_URL` com a URL publica do backend, por exemplo `https://biocompiler-api.onrender.com`.
-4. Garanta que essa variavel esteja disponivel durante o build, pois o Vite incorpora valores `VITE_*` no bundle.
-5. Use a porta fornecida pelo Render. O Dockerfile utiliza automaticamente `PORT` e assume `10000` como valor local.
+- `biocompiler-api`: backend Spring Boot como Web Service;
+- `biocompiler-web`: frontend como Web Service;
+- `biocompiler-db`: PostgreSQL gerenciado.
 
-O backend deve ser publicado como outro **Web Service** Docker usando `backend/biocompiler/Dockerfile`. Para usar o plano gratuito, configure exatamente `SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/biocompiler.db` e nao adicione Persistent Disk. O SQLite funcionara normalmente durante a execucao do servico, mas o filesystem gratuito do Render e efemero: o historico pode ser apagado quando o servico reiniciar, dormir ou receber um novo deploy. O servico SQLite do Compose continua sendo usado apenas no ambiente local.
+No Render, selecione **New > Blueprint**, conecte o repositório e confirme o arquivo `render.yaml`. O Blueprint conecta o backend ao PostgreSQL por rede privada e injeta a URL pública da API no build do frontend. Também configura o CORS do backend com a URL pública do frontend.
 
-Se a persistencia do historico for obrigatoria, sera necessario usar um banco externo com plano gratuito, como PostgreSQL. Isso exige adaptar o backend, o driver JDBC, o dialeto Hibernate e a configuracao do datasource; nao e preciso fazer essa migracao para colocar a versao atual no ar sem custo.
+Os nomes dos serviços precisam ser únicos no seu workspace. Caso já existam recursos com esses nomes, altere os três nomes e as respectivas referências `name` no mesmo arquivo antes da primeira sincronização.
 
-### Configuracao do backend no Render
-
-O backend usa a porta informada pelo Render em `PORT`. Nao fixe `8080` no servico publicado; o container repassa automaticamente `PORT` para o Spring Boot.
-
-Para o frontend, `VITE_API_BASE_URL` e uma variavel de build. Depois que o frontend for construido, alterar essa variavel apenas no ambiente de execucao nao altera o bundle; e necessario iniciar um novo deploy.
+O Render fornece a variável `PORT` para cada Web Service; os Dockerfiles usam essa porta automaticamente. `VITE_API_BASE_URL` é incorporada no bundle durante o build, portanto qualquer alteração dessa variável exige um novo deploy do frontend.
 
 ## Executar sem Docker
 

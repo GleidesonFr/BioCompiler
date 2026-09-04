@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: biocompiler-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: ./backend/biocompiler
+    dockerfilePath: ./backend/biocompiler/Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: biocompiler-db
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: biocompiler-db
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: biocompiler-db
+          property: database
+      - key: DATABASE_USER
+        fromDatabase:
+          name: biocompiler-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: biocompiler-db
+          property: password
+      - key: CORS_ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: biocompiler-web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: biocompiler-web
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: ./frontend/biocompiler
+    dockerfilePath: ./frontend/biocompiler/Dockerfile
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: biocompiler-api
+          envVarKey: RENDER_EXTERNAL_URL
+
+databases:
+  - name: biocompiler-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "17"
