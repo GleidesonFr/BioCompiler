@@ -1,7 +1,5 @@
 package br.ufpi.biocompiler.config;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import javax.sql.DataSource;
@@ -21,9 +19,17 @@ public class DatabaseMigrationService {
 
     @PostConstruct
     public void migrate() {
-        List<Map<String, Object>> columns = jdbcTemplate.queryForList("PRAGMA table_info('analyses')");
-        boolean hasSessionId = columns.stream()
-            .anyMatch(row -> "session_id".equalsIgnoreCase(String.valueOf(row.get("name"))));
+        Integer columnCount = jdbcTemplate.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'analyses'
+              AND column_name = 'session_id'
+            """,
+            Integer.class
+        );
+        boolean hasSessionId = columnCount != null && columnCount > 0;
 
         if (!hasSessionId) {
             jdbcTemplate.execute("ALTER TABLE analyses ADD COLUMN session_id TEXT");

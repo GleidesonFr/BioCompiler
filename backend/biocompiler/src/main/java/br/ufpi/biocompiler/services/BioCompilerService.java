@@ -51,4 +51,8 @@ public class BioCompilerService {
     public Map<ResultType, Long> getStatistics(UUID sessionId) {
         return analysisPersistenceService.getStatistics(sessionId);
     }
+
+    public List<Analysis> getAllForExport(UUID sessionId) {
+        return analysisPersistenceService.findAllForExport(sessionId);
+    }
 }

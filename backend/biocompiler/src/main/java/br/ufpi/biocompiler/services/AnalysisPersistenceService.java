@@ -1,5 +1,6 @@
 package br.ufpi.biocompiler.services;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -45,5 +46,9 @@ public class AnalysisPersistenceService {
                 row -> (ResultType) row[0],
                 row -> (Long) row[1]
             ));
+    }
+
+    public List<Analysis> findAllForExport(UUID sessionId) {
+        return analysisRepository.findAllBySessionIdOrderByAnalysisDateAsc(sessionId);
     }
 }

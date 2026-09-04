@@ -6,7 +6,6 @@ COPY . .
 
 RUN chmod +x mvnw && ./mvnw -q -DskipTests package
 
-ENV SPRING_DATASOURCE_URL=jdbc:sqlite:/app/data/biocompiler.db
 ENV SERVER_PORT=10000
 EXPOSE 10000
 

@@ -10,6 +10,7 @@ import br.ufpi.biocompiler.dto.AnalysisResponse;
 import br.ufpi.biocompiler.dto.AnalysisStatisticsResponse;
 import br.ufpi.biocompiler.models.Analysis;
 import br.ufpi.biocompiler.models.ResultType;
+import br.ufpi.biocompiler.services.AnalysisExportService;
 import br.ufpi.biocompiler.services.BioCompilerService;
 import br.ufpi.biocompiler.services.DNAFileReaderService;
 
@@ -18,10 +19,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,10 +40,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 public class AnalysisController {
     private final BioCompilerService bioCompilerService;
     private final DNAFileReaderService readerService;
+    private final AnalysisExportService exportService;
 
-    public AnalysisController(BioCompilerService bioCompilerService, DNAFileReaderService readerService){
+    public AnalysisController(BioCompilerService bioCompilerService, DNAFileReaderService readerService, AnalysisExportService exportService){
         this.bioCompilerService = bioCompilerService;
         this.readerService = readerService;
+        this.exportService = exportService;
     }
 
     @PostMapping
@@ -103,6 +109,18 @@ public class AnalysisController {
                 nonsense
             )
         );
-    }    
+    }
+    
+    @GetMapping("/history/export")
+    public ResponseEntity<Resource> exportHistory(@RequestParam UUID sessionId) throws IOException {
+        List<Analysis> analyses = bioCompilerService.getAllForExport(sessionId);
+        Resource fileResource = exportService.generateTxT(analyses);
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"resultados.txt\"")
+            .contentType(MediaType.parseMediaType("text/plain; charset=UTF-8"))
+            .contentLength(fileResource.contentLength())
+            .body(fileResource);
+    }
     
 }

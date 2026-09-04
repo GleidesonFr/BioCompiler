@@ -16,6 +16,8 @@ public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
 
     void deleteAllBySessionId(UUID sessionId);
 
+    List<Analysis> findAllBySessionIdOrderByAnalysisDateAsc(UUID sessionId);
+
     @Query(
         """
            SELECT a.resultType, count(a)
@@ -25,4 +27,6 @@ public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
         """
     )
     List<Object[]> countAnalysesByResultType(@Param("sessionId") UUID sessionId);
+
+    List<Analysis> findAllBySessionIdOrderByAnalysisDateDesc(@Param("sessionId") UUID sessionId);
 }

@@ -315,43 +315,56 @@ public class BioCompilerTerminal implements CommandLineRunner{
         String answer = scanner.nextLine().trim().toUpperCase();
 
         if(answer.equals("S")){
-            System.out.print("Nome do arquivo [resultados.txt]: ");
-            String fileName = scanner.nextLine().trim();
+            System.out.print("Caminho para salvar o resultado [resultados.txt]: ");
+            String outputPath = scanner.nextLine().trim();
 
-            if(fileName.isEmpty()){
-                fileName = "resultados.txt";
+            if(outputPath.isEmpty()){
+                outputPath = "resultados.txt";
             }
 
-            exportResults(analyses, fileName);
+            exportResults(analyses, outputPath);
         }
     }
 
     private void exportResults(List<Analysis> analyses, String fileName){
         Path path = Paths.get(fileName);
 
-        try(BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)){
-            writer.write("linha;status;resultado;pre_mRNA");
-            writer.newLine();
+        try {
+            Path parent = path.getParent();
 
-            int line = 1;
-
-            for(Analysis analysis : analyses){
-                String status = analysis.getResultType() == ResultType.CORRECT ? "OK" : "ERRO";
-                String result = getResultMessage(analysis.getResultType());
-                String preMrna = analysis.getResultType() == ResultType.CORRECT ? getValue(analysis.getPreMrna(), "NÃO GERADO") : "NÃO GERADO";
-
-                writer.write(String.format("%d;%s;%s;%s", line, status, result, preMrna));
-                writer.newLine();
-                line++;
+            if(parent != null){
+                Files.createDirectories(parent);
             }
 
+            try(BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)){
+                writer.write("linha;status;resultado;pre_mRNA");
+                writer.newLine();
+
+                int line = 1;
+
+                for(Analysis analysis : analyses){
+                    String status = analysis.getResultType() == ResultType.CORRECT ? "OK" : "ERRO";
+                    String result = getResultMessage(analysis.getResultType());
+                    String preMrna = analysis.getResultType() == ResultType.CORRECT ? getValue(analysis.getPreMrna(), "NÃO GERADO") : "NÃO GERADO";
+
+                    writer.write(String.format("%d;%s;%s;%s", line, status, result, preMrna));
+                    writer.newLine();
+                    line++;
+                }
+
+                System.out.println();
+                System.out.println("Resultados exportados com sucesso para: " + path.toAbsolutePath());
+            }
+            catch(IOException e){
+                System.out.println();
+                System.out.println("Erro ao exportar os resultados:");
+                System.out.println(e.getMessage());
+            }            
+        } catch (IOException e) {
             System.out.println();
-            System.out.println("Resultados exportados com sucesso para: " + path.toAbsolutePath());
-        }
-        catch(IOException e){
-            System.out.println();
-            System.out.println("Erro ao exportar os resultados:");
+            System.out.println("Erro ao criar diretório para exportação:");
             System.out.println(e.getMessage());
         }
+
     }  
 }
