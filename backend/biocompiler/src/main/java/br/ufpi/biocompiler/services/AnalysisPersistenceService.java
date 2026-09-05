@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import br.ufpi.biocompiler.models.ResultType;
 import br.ufpi.biocompiler.repositories.AnalysisRepository;
 
 @Service
+@Profile("!terminal")
 public class AnalysisPersistenceService {
     
     private final AnalysisRepository analysisRepository;

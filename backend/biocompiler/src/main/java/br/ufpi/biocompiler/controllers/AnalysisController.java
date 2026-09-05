@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +37,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 
 @RestController
+@Profile("!terminal")
 @RequestMapping("/api/analysis")
 public class AnalysisController {
     private final BioCompilerService bioCompilerService;
