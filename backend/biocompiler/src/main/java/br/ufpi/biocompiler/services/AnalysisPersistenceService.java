@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import br.ufpi.biocompiler.models.Analysis;
 import br.ufpi.biocompiler.models.ResultType;
@@ -35,6 +36,7 @@ public class AnalysisPersistenceService {
             .orElseThrow(() -> new RuntimeException("Análise não encontrada com id: " + id));
     }
 
+    @Transactional
     public void deleteAllForSession(UUID sessionId) {
         analysisRepository.deleteAllBySessionId(sessionId);
     }

@@ -10,6 +10,17 @@ import { API } from "@/lib/api";
 import { useHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
 import { DnaLoader } from "@/components/DnaLoader";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const PAGE_SIZE = 8;
 
@@ -69,6 +80,8 @@ function Historico() {
     nonsense: 0,
   });
   const [downloading, setDownloading] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const { records, loading, error, refresh } = useHistory(page - 1, PAGE_SIZE);
   const navigate = useNavigate();
 
@@ -124,7 +137,7 @@ function Historico() {
   const rows = records.content;
 
   const clear = async () => {
-    if (!window.confirm("Deseja realmente limpar todo o histórico?")) return;
+    setClearing(true);
     try {
       await API.clearHistory();
       setPage(1);
@@ -139,8 +152,12 @@ function Historico() {
       await refresh(0, PAGE_SIZE);
       const nextStats = await API.getHistoryStats();
       setStats(nextStats);
+      setClearDialogOpen(false);
+      toast.success("Histórico limpo com sucesso.");
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Não foi possível limpar o histórico.");
+      toast.error(err instanceof Error ? err.message : "Não foi possível limpar o histórico.");
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -182,13 +199,33 @@ function Historico() {
             {downloading ? "Preparando..." : "Baixar dados"}
           </Button>
           {records.totalElements > 0 && (
-            <Button
-              variant="brandOutline"
-              onClick={() => void clear()}
-            >
-              <Trash2 className="size-4" />
-              Limpar histórico
-            </Button>
+            <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+              <Button variant="brandOutline" onClick={() => setClearDialogOpen(true)}>
+                <Trash2 className="size-4" />
+                Limpar histórico
+              </Button>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Limpar todo o histórico?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação remove permanentemente todas as análises desta sessão e não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={clearing}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={clearing}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      void clear();
+                    }}
+                  >
+                    {clearing ? "Limpando..." : "Limpar histórico"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>

@@ -8,18 +8,18 @@ function generateSessionId(): string {
 }
 
 export function getSessionId(): string {
-  const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  const stored = localStorage.getItem(SESSION_STORAGE_KEY);
   if (stored) return stored;
 
   const nextSessionId = generateSessionId();
-  sessionStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
+  localStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
   return nextSessionId;
 }
 
 export function resetSessionId(): void {
-  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  localStorage.removeItem(SESSION_STORAGE_KEY);
   const nextSessionId = generateSessionId();
-  sessionStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
+  localStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
 }
 
 export interface PaginatedResponse<T> {
