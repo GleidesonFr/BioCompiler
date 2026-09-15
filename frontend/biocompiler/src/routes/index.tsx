@@ -12,16 +12,16 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BioCompiler 1.0 — Análise de sequências de DNA" },
+      { title: "BioCompiler — Análise de DNA e pré-mRNA" },
       {
         name: "description",
         content:
-          "Compile e valide sequências de DNA por texto ou arquivo: start codon, stop codon, frame shift e nonsense mutation.",
+          "Analise sequências de DNA e pré-mRNA por texto ou arquivo, com validação didática de transcrição e splicing.",
       },
-      { property: "og:title", content: "BioCompiler 1.0 — Análise de sequências de DNA" },
+      { property: "og:title", content: "BioCompiler — Análise de DNA e pré-mRNA" },
       {
         property: "og:description",
-        content: "Valide sequências de DNA por texto ou arquivo em segundos.",
+        content: "Valide sequências de DNA e pré-mRNA por texto ou arquivo em segundos.",
       },
     ],
   }),
@@ -60,7 +60,7 @@ function Index() {
 
     const sequence = text.trim();
     if (!sequence) {
-      setError("Digite uma sequência de DNA para analisar.");
+      setError("Digite uma sequência de DNA ou pré-mRNA para analisar.");
       return;
     }
 
@@ -87,11 +87,11 @@ function Index() {
             <Sparkles className="size-3.5" /> Compilador genético
           </span>
           <h1 className="mt-5 text-4xl font-semibold sm:text-5xl">
-            Analise sua sequência de DNA
+            Analise DNA ou pré-mRNA
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-            Cole a sequência ou envie um arquivo. O BioCompiler verifica bases, quadro de
-            leitura e códons de início e parada.
+            Cole a sequência ou envie um arquivo. O BioCompiler identifica o tipo e aplica
+            transcrição de DNA ou splicing e maturação de pré-mRNA.
           </p>
         </div>
 
@@ -143,7 +143,7 @@ function Index() {
                 {file ? file.name : "Clique para escolher um arquivo CSV ou TXT"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Envie um arquivo com uma sequência de DNA por linha
+                Envie um arquivo com uma sequência de DNA ou pré-mRNA por linha
               </p>
               <Input
                 ref={inputRef}
@@ -158,7 +158,7 @@ function Index() {
               key="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG..."
+              placeholder="ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG... ou CCUAUGGCUGUAACCUUUAACUAACAAGAUGGCCUAC"
               className="animate-field-left min-h-44 resize-y font-mono text-sm tracking-wider"
             />
           )}
@@ -178,7 +178,7 @@ function Index() {
         </section>
 
       </main>
-      {loading && <DnaLoaderOverlay label="Compilando sequência de DNA..." />}
+      {loading && <DnaLoaderOverlay label="Processando sequência..." />}
     </div>
   );
 }

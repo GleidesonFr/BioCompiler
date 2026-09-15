@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.ufpi.biocompiler.models.Analysis;
 import br.ufpi.biocompiler.models.ResultType;
+import br.ufpi.biocompiler.models.SequenceType;
 import br.ufpi.biocompiler.repositories.AnalysisRepository;
 
 @Service
@@ -49,6 +50,21 @@ public class AnalysisPersistenceService {
             .collect(Collectors.toMap(
                 row -> (ResultType) row[0],
                 row -> (Long) row[1]
+            ));
+    }
+
+    public Map<SequenceType, Map<ResultType, Long>> getStatisticsBySequenceType(UUID sessionId) {
+        return analysisRepository.countAnalysesBySequenceTypeAndResultType(sessionId)
+            .stream()
+            .collect(Collectors.groupingBy(
+                row -> (SequenceType) row[0],
+                () -> new java.util.EnumMap<>(SequenceType.class),
+                Collectors.toMap(
+                    row -> (ResultType) row[1],
+                    row -> (Long) row[2],
+                    Long::sum,
+                    () -> new java.util.EnumMap<>(ResultType.class)
+                )
             ));
     }
 

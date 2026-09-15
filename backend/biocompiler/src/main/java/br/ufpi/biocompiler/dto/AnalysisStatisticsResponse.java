@@ -6,5 +6,13 @@ public record AnalysisStatisticsResponse(
     long startMissing,
     long stopMissing,
     long frameshift,
-    long nonsense
+    long nonsense,
+    long dnaCorrect,
+    long rnaCorrect,
+    long rnaInvalidBase,
+    long fivePrimeSite,
+    long branchPoint,
+    long threePrimeSite,
+    long incompleteIntron,
+    long alternativeSplicing
 ) {}

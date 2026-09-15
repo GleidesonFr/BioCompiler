@@ -11,24 +11,25 @@ import org.springframework.stereotype.Service;
 
 import br.ufpi.biocompiler.models.Analysis;
 import br.ufpi.biocompiler.models.ResultType;
+import br.ufpi.biocompiler.models.SequenceType;
 
 @Service
 @Profile("!terminal")
 public class BioCompilerService {
 
-    private final DNAAnalysisService dnaAnalysisService;
+    private final SequenceProcessorProxy sequenceProcessorProxy;
     private final AnalysisPersistenceService analysisPersistenceService;
 
     public BioCompilerService(
-        DNAAnalysisService dnaAnalysisService,
+        SequenceProcessorProxy sequenceProcessorProxy,
         AnalysisPersistenceService analysisPersistenceService
     ){
-        this.dnaAnalysisService = dnaAnalysisService;
+        this.sequenceProcessorProxy = sequenceProcessorProxy;
         this.analysisPersistenceService = analysisPersistenceService;
     }
     
     public Analysis analyzeAndSave(String sequence, UUID uuid){
-        Analysis analysis = dnaAnalysisService.analyze(sequence);
+        Analysis analysis = sequenceProcessorProxy.process(sequence);
         analysis.setSessionId(uuid);
 
         return analysisPersistenceService.save(analysis);
@@ -52,6 +53,10 @@ public class BioCompilerService {
 
     public Map<ResultType, Long> getStatistics(UUID sessionId) {
         return analysisPersistenceService.getStatistics(sessionId);
+    }
+
+    public Map<SequenceType, Map<ResultType, Long>> getStatisticsBySequenceType(UUID sessionId) {
+        return analysisPersistenceService.getStatisticsBySequenceType(sessionId);
     }
 
     public List<Analysis> getAllForExport(UUID sessionId) {

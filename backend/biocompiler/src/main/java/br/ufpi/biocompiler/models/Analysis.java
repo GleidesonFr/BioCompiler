@@ -35,6 +35,10 @@ public class Analysis {
     private String originalSequence;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "sequence_type", length = 20)
+    private SequenceType sequenceType;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "result_type", nullable = false)
     private ResultType resultType;
 
@@ -53,6 +57,9 @@ public class Analysis {
 
     @Column(name = "pre_mrna", length = 10000)
     private String preMrna;
+
+    @Column(name = "mature_mrna", length = 10000)
+    private String matureMrna;
 
     @Column(length = 1000)
     private String message;

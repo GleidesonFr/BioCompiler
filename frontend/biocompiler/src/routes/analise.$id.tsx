@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowLeft } from "lucide-react";
+import { ArrowDown, ArrowLeft, Scissors } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { SeverityBadge, StatusPill } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -63,21 +63,31 @@ function AnalisePage() {
               <div className="min-w-0">
                 <h1 className="truncate text-3xl font-semibold">Análise #{detail.analysis.id}</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {new Date(detail.analysis.analysisDate).toLocaleString("pt-BR")} · {detail.sequence.length} bases · GC {detail.gcContent}%
+                  {new Date(detail.analysis.analysisDate).toLocaleString("pt-BR")} · {detail.sequence.length} bases · {detail.sequenceType === "DNA" ? `GC ${detail.gcContent}%` : "pré-mRNA"}
                 </p>
               </div>
             </header>
 
-            <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Info label="Quadro de leitura">{detail.analysis.readingFrame ?? "Indefinido"}</Info>
-              <Info label="START (ATG)">{detail.startIndex === null ? "Não encontrado" : `posição ${detail.startIndex + 1}`}</Info>
-              <Info label="STOP">{detail.stopIndex === null ? "Não encontrado" : `${detail.sequence.slice(detail.stopIndex, detail.stopIndex + 3)} na posição ${detail.stopIndex + 1}`}</Info>
-              <Info label="Região codificadora">{detail.analysis.codingRegion ?? "Não definida"}</Info>
-              <Info label="Resultado">{STATUS_META[detail.status].label}</Info>
-              <Info label="Mensagem">{detail.analysis.message ?? "—"}</Info>
-            </section>
+            {detail.sequenceType === "DNA" ? (
+              <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Info label="Quadro de leitura">{detail.analysis.readingFrame ?? "Indefinido"}</Info>
+                <Info label="START (ATG)">{detail.startIndex === null ? "Não encontrado" : `posição ${detail.startIndex + 1}`}</Info>
+                <Info label="STOP">{detail.stopIndex === null ? "Não encontrado" : `${detail.sequence.slice(detail.stopIndex, detail.stopIndex + 3)} na posição ${detail.stopIndex + 1}`}</Info>
+                <Info label="Região codificadora">{detail.analysis.codingRegion ?? "Não definida"}</Info>
+                <Info label="Resultado">{STATUS_META[detail.status].label}</Info>
+                <Info label="Mensagem">{detail.analysis.message ?? "—"}</Info>
+              </section>
+            ) : (
+              <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Info label="Processamento">Splicing e maturação</Info>
+                <Info label="CAP 5'">{detail.status === "ok" ? "m7Gppp adicionada" : "Não gerada"}</Info>
+                <Info label="Cauda poli-A">{detail.status === "ok" ? "100 adeninas" : "Não gerada"}</Info>
+                <Info label="Resultado">{STATUS_META[detail.status].label}</Info>
+                <Info label="Mensagem">{detail.analysis.message ?? "—"}</Info>
+              </section>
+            )}
 
-            <SequenceViewer detail={detail} />
+            {detail.sequenceType === "DNA" ? <SequenceViewer detail={detail} /> : <RnaSequenceViewer detail={detail} />}
           </>
         )}
       </main>
@@ -263,5 +273,158 @@ function legend(status: SequenceDetail["status"]) {
       return "A leitura em trincas não fecha: sobram bases no final da sequência.";
     case "nonsense":
       return "Mais de um STOP no mesmo quadro de leitura do start.";
+    default:
+      return "Visualização disponível para análises de DNA.";
   }
+}
+
+function RnaSequenceViewer({ detail }: { detail: SequenceDetail }) {
+  const { sequence, status, matureMrna } = detail;
+  const canonicalFivePrimeStart = sequence.length >= 14 ? 12 : -1;
+  const intronStart = sequence.startsWith("GU", 12) ? 12 : sequence.indexOf("GU");
+  const intronEnd = intronStart >= 0 ? sequence.indexOf("AG", intronStart + 2) : -1;
+  const branchStart = intronEnd >= 0 ? Math.max(intronStart + 2, intronEnd - 30) : -1;
+  const branchEnd = intronEnd >= 0 ? intronEnd - 10 : -1;
+  const branchPoint = branchStart >= 0
+    ? Array.from({ length: Math.max(0, branchEnd - branchStart + 1) }, (_, offset) => branchStart + offset)
+      .find((index) => sequence[index] === "A") ?? -1
+    : -1;
+  const [step, setStep] = useState(0);
+  const [done, setDone] = useState(false);
+  const [scanPair, setScanPair] = useState(-1);
+  const [scanDone, setScanDone] = useState(false);
+  const isError = status !== "ok";
+  const fivePrimeStart = intronStart >= 0 ? intronStart : canonicalFivePrimeStart;
+  const threePrimeStart = intronEnd >= 0 ? intronEnd : sequence.length >= 36 ? 34 : -1;
+  const alternativeEnds = intronStart >= 0
+    ? Array.from({ length: sequence.length - intronStart }, (_, offset) => intronStart + offset)
+      .filter((index) => sequence.slice(index, index + 2) === "AG")
+    : [];
+
+  useEffect(() => {
+    setStep(0);
+    setDone(false);
+    const timers = [
+      window.setTimeout(() => setStep(1), 350),
+      window.setTimeout(() => setStep(2), 760),
+      window.setTimeout(() => setStep(3), 1170),
+      window.setTimeout(() => {
+        setStep(4);
+        setDone(true);
+      }, 1580),
+    ];
+    return () => timers.forEach(window.clearTimeout);
+  }, [sequence, status]);
+
+  useEffect(() => {
+    const scansFivePrimeSite = status === "five_prime_site";
+    const scansThreePrimeSite = status === "three_prime_site" && intronStart >= 0;
+    if (!scansFivePrimeSite && !scansThreePrimeSite) {
+      setScanPair(-1);
+      setScanDone(false);
+      return;
+    }
+
+    const firstPair = scansFivePrimeSite ? 0 : intronStart + 2;
+    setScanPair(firstPair);
+    setScanDone(false);
+
+    const timer = window.setInterval(() => {
+      setScanPair((currentPair) => {
+        const nextPair = currentPair + 2;
+        if (nextPair >= sequence.length) {
+          window.clearInterval(timer);
+          setScanDone(true);
+          return currentPair;
+        }
+        return nextPair;
+      });
+    }, 180);
+
+    return () => window.clearInterval(timer);
+  }, [intronStart, sequence.length, status]);
+
+  const baseClass = (index: number) => {
+    if (status === "invalid_base") {
+      return index === detail.invalidIndex ? "bg-destructive/15 text-destructive font-bold blink-soft" : "text-muted-foreground";
+    }
+    if (status === "five_prime_site") {
+      if (scanDone) return "text-destructive font-bold rna-error-glow";
+      if (index >= scanPair && index < scanPair + 2) return "bg-secondary/20 text-secondary font-bold";
+      return "text-foreground/60";
+    }
+    if (status === "three_prime_site") {
+      if (scanDone && intronStart >= 0 && index >= intronStart) return "text-destructive font-bold rna-error-glow";
+      if (index >= scanPair && index < scanPair + 2) return "bg-secondary/20 text-secondary font-bold";
+      return "text-foreground/60";
+    }
+    if (status === "branch_point" && intronStart >= 0 && intronEnd >= 0) {
+      if (index >= intronStart && index < intronStart + 2 || index >= intronEnd && index < intronEnd + 2) {
+        return "bg-secondary/20 text-secondary font-bold";
+      }
+      if (index > intronStart + 1 && index < intronEnd) {
+        return "bg-destructive/15 text-destructive font-bold rna-error-glow";
+      }
+    }
+    if (fivePrimeStart >= 0 && index >= fivePrimeStart && index < fivePrimeStart + 2) {
+      return step >= 1 ? "bg-secondary/20 text-secondary font-bold" : "text-foreground/70";
+    }
+    if (index === branchPoint) {
+      return step >= 2 ? "bg-warn/20 text-warn font-bold" : "text-foreground/70";
+    }
+    if (threePrimeStart >= 0 && index >= threePrimeStart && index < threePrimeStart + 2) {
+      return step >= 3 ? "bg-secondary/20 text-secondary font-bold" : "text-foreground/70";
+    }
+    if (status === "incomplete_intron" && fivePrimeStart >= 0 && index >= fivePrimeStart && step >= 2) return "text-warn blink-soft";
+    if (status === "alternative_splicing" && alternativeEnds.some((end) => index >= end && index < end + 2) && step >= 3) {
+      return "bg-warn/20 text-warn font-bold blink-soft";
+    }
+    return "text-foreground/70";
+  };
+
+  const animationMessage = () => {
+    if (status === "ok") return "Reconhecendo sítios, removendo o íntron e revelando o mRNA maduro.";
+    if (status === "five_prime_site") return "Procurando o sítio 5' GU na posição esperada.";
+    if (status === "branch_point") return "O íntron foi delimitado, mas nenhum branch point A atende à distância exigida.";
+    if (status === "three_prime_site") return "O sítio 5' foi encontrado; a busca pelo sítio 3' AG não foi concluída.";
+    if (status === "incomplete_intron") return "A leitura iniciou no sítio 5', mas a estrutura terminou antes de completar o íntron.";
+    if (status === "alternative_splicing") return "Mais de um sítio 3' válido foi reconhecido; o processamento permanece ambíguo.";
+    return "A sequência foi validada contra o alfabeto de RNA A, C, G e U.";
+  };
+
+  return (
+    <section className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-panel">
+      <h2 className="text-lg font-semibold">Pré-mRNA</h2>
+      <p className="mt-1 text-xs text-muted-foreground">{animationMessage()}</p>
+
+      <div className="mt-4 flex flex-wrap gap-x-[3px] gap-y-2 font-mono text-sm sm:text-base">
+        {sequence.split("").map((base, index) => (
+          <span key={index} className={cn("rounded-sm px-[1px] transition-colors", baseClass(index))}>{base}</span>
+        ))}
+      </div>
+
+      {status === "ok" && matureMrna ? (
+        <div className={cn("mt-8", step >= 4 ? "animate-fade-in" : "opacity-40")}>
+          <div className="flex items-center justify-center gap-2 text-secondary">
+            <Scissors className={cn("size-5", step === 3 && "animate-pulse")} />
+            <span className="text-xs font-medium">Splicing: íntron removido, éxons unidos</span>
+          </div>
+          <div className="mt-4 rounded-2xl border border-secondary/20 bg-secondary/5 p-4">
+            <p className="text-xs font-medium text-secondary">mRNA maduro</p>
+            <p className="mt-2 max-h-36 overflow-y-auto break-all font-mono text-sm leading-6 text-foreground/80">{matureMrna}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-secondary/15 px-2.5 py-1 font-medium text-secondary">CAP 5': m7Gppp</span>
+              <span className="rounded-full bg-ok/15 px-2.5 py-1 font-medium text-ok">Cauda poli-A: 100 A</span>
+            </div>
+          </div>
+        </div>
+      ) : isError && (
+        <div className={cn("mt-8 flex flex-col items-center text-center", done ? "animate-fade-in" : "opacity-40")}>
+          <ArrowDown className="size-5 text-destructive" />
+          <p className="mt-2 text-sm font-medium text-destructive">{STATUS_META[status].label}</p>
+          <p className="mt-1 text-xs text-muted-foreground">mRNA maduro não gerado.</p>
+        </div>
+      )}
+    </section>
+  );
 }

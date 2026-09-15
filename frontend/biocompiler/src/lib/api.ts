@@ -39,6 +39,14 @@ export interface HistoryStats {
   stopMissing: number;
   frameshift: number;
   nonsense: number;
+  dnaCorrect: number;
+  rnaCorrect: number;
+  rnaInvalidBase: number;
+  fivePrimeSite: number;
+  branchPoint: number;
+  threePrimeSite: number;
+  incompleteIntron: number;
+  alternativeSplicing: number;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {

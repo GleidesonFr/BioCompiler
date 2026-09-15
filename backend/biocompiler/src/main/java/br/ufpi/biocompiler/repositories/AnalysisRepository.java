@@ -28,5 +28,15 @@ public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
     )
     List<Object[]> countAnalysesByResultType(@Param("sessionId") UUID sessionId);
 
+    @Query(
+        """
+           SELECT a.sequenceType, a.resultType, count(a)
+           FROM Analysis a
+           WHERE a.sessionId = :sessionId
+           GROUP BY a.sequenceType, a.resultType
+        """
+    )
+    List<Object[]> countAnalysesBySequenceTypeAndResultType(@Param("sessionId") UUID sessionId);
+
     List<Analysis> findAllBySessionIdOrderByAnalysisDateDesc(@Param("sessionId") UUID sessionId);
 }

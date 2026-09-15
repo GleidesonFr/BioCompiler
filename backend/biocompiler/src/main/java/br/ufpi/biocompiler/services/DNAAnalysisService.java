@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 
 import br.ufpi.biocompiler.models.Analysis;
 import br.ufpi.biocompiler.models.ResultType;
+import br.ufpi.biocompiler.models.SequenceType;
 import br.ufpi.biocompiler.models.StartCodon;
 import br.ufpi.biocompiler.models.StopCodon;
+import br.ufpi.biocompiler.utils.SequenceProcessor;
 
 @Service
-public class DNAAnalysisService {
+public class DNAAnalysisService implements SequenceProcessor {
     
     private final DNAValidatorService dnaValidatorService;
     private final StartCodonService startCodonService;
@@ -42,6 +44,7 @@ public class DNAAnalysisService {
     public Analysis analyze(String sequence){
         Analysis analysis = new Analysis();
         analysis.setOriginalSequence(sequence);
+        analysis.setSequenceType(SequenceType.DNA);
         analysis.setAnalysisDate(LocalDateTime.now());
 
         if(!dnaValidatorService.isValidDNA(sequence)){
@@ -89,6 +92,11 @@ public class DNAAnalysisService {
         analysis.setResultType(ResultType.CORRECT);
         return finishAnalysis(analysis, ResultType.CORRECT);
         
+    }
+
+    @Override
+    public Analysis process(String sequence) {
+        return analyze(sequence);
     }
 
     private Analysis finishAnalysis(Analysis analysis, ResultType resultType){

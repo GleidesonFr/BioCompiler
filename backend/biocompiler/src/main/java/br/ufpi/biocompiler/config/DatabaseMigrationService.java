@@ -40,5 +40,29 @@ public class DatabaseMigrationService {
                 UUID.randomUUID().toString()
             );
         }
+
+        updateResultTypeConstraint();
+    }
+
+    private void updateResultTypeConstraint() {
+        jdbcTemplate.execute("ALTER TABLE analyses DROP CONSTRAINT IF EXISTS analyses_result_type_check");
+        jdbcTemplate.execute(
+            """
+            ALTER TABLE analyses
+            ADD CONSTRAINT analyses_result_type_check CHECK (result_type IN (
+                'CORRECT',
+                'INVALID_BASE',
+                'START_CODON_NOT_FOUND',
+                'STOP_CODON_NOT_FOUND',
+                'FRAME_SHIFT',
+                'NONSENSE_MUTATION',
+                'FIVE_PRIME_SITE_ERROR',
+                'BRANCH_POINT_ERROR',
+                'THREE_PRIME_SITE_ERROR',
+                'INCOMPLETE_INTRON',
+                'ALTERNATIVE_SPLICING'
+            ))
+            """
+        );
     }
 }

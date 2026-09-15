@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Download, LoaderCircle, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Dna, Download, LoaderCircle, Scissors, Trash2 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { SeverityBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { mapBackendStatus, STATUS_META, STATUS_ORDER, type AnalysisStatus } from "@/lib/dna";
+import { getSequenceType, mapBackendStatus, RNA_STATUS_ORDER, STATUS_META, STATUS_ORDER, type AnalysisStatus } from "@/lib/dna";
 import { API } from "@/lib/api";
 import { useHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,23 @@ import {
 import { toast } from "sonner";
 
 const PAGE_SIZE = 8;
+
+const EMPTY_STATS = {
+  correct: 0,
+  invalidBase: 0,
+  startMissing: 0,
+  stopMissing: 0,
+  frameshift: 0,
+  nonsense: 0,
+  dnaCorrect: 0,
+  rnaCorrect: 0,
+  rnaInvalidBase: 0,
+  fivePrimeSite: 0,
+  branchPoint: 0,
+  threePrimeSite: 0,
+  incompleteIntron: 0,
+  alternativeSplicing: 0,
+};
 
 export const Route = createFileRoute("/historico")({
   head: () => ({
@@ -71,14 +88,7 @@ function StatNumber({ value, tone }: { value: number; tone: string }) {
 
 function Historico() {
   const [page, setPage] = useState(1);
-  const [stats, setStats] = useState({
-    correct: 0,
-    invalidBase: 0,
-    startMissing: 0,
-    stopMissing: 0,
-    frameshift: 0,
-    nonsense: 0,
-  });
+  const [stats, setStats] = useState(EMPTY_STATS);
   const [downloading, setDownloading] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -94,14 +104,7 @@ function Historico() {
         if (active) setStats(nextStats);
       } catch {
         if (active) {
-          setStats({
-            correct: 0,
-            invalidBase: 0,
-            startMissing: 0,
-            stopMissing: 0,
-            frameshift: 0,
-            nonsense: 0,
-          });
+          setStats(EMPTY_STATS);
         }
       }
     };
@@ -112,9 +115,9 @@ function Historico() {
     };
   }, []);
 
-  const counts = useMemo(() => {
+  const dnaCounts = useMemo(() => {
     const base = Object.fromEntries(STATUS_ORDER.map((s) => [s, 0])) as Record<AnalysisStatus, number>;
-    base.ok = stats.correct;
+    base.ok = stats.dnaCorrect;
     base.invalid_base = stats.invalidBase;
     base.start_missing = stats.startMissing;
     base.stop_missing = stats.stopMissing;
@@ -122,6 +125,21 @@ function Historico() {
     base.nonsense = stats.nonsense;
     return base;
   }, [stats]);
+
+  const rnaCounts = useMemo(() => {
+    const base = Object.fromEntries(RNA_STATUS_ORDER.map((s) => [s, 0])) as Record<AnalysisStatus, number>;
+    base.ok = stats.rnaCorrect;
+    base.invalid_base = stats.rnaInvalidBase;
+    base.five_prime_site = stats.fivePrimeSite;
+    base.branch_point = stats.branchPoint;
+    base.three_prime_site = stats.threePrimeSite;
+    base.incomplete_intron = stats.incompleteIntron;
+    base.alternative_splicing = stats.alternativeSplicing;
+    return base;
+  }, [stats]);
+
+  const hasDnaHistory = STATUS_ORDER.some((status) => dnaCounts[status] > 0);
+  const hasRnaHistory = RNA_STATUS_ORDER.some((status) => rnaCounts[status] > 0);
 
   useEffect(() => {
     if (records.totalPages > 0 && page > records.totalPages) {
@@ -141,14 +159,7 @@ function Historico() {
     try {
       await API.clearHistory();
       setPage(1);
-      setStats({
-        correct: 0,
-        invalidBase: 0,
-        startMissing: 0,
-        stopMissing: 0,
-        frameshift: 0,
-        nonsense: 0,
-      });
+      setStats(EMPTY_STATS);
       await refresh(0, PAGE_SIZE);
       const nextStats = await API.getHistoryStats();
       setStats(nextStats);
@@ -230,18 +241,8 @@ function Historico() {
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {STATUS_ORDER.map((status) => {
-          const meta = STATUS_META[status];
-          const tone = meta.tone === "ok" ? "text-ok" : meta.tone === "warn" ? "text-warn" : "text-destructive";
-          return (
-            <div key={status} className="rounded-2xl border border-border bg-card p-5 shadow-panel">
-              <p className="text-sm text-muted-foreground">{meta.label}</p>
-              <StatNumber value={counts[status]} tone={tone} />
-            </div>
-          );
-        })}
-      </div>
+      {hasDnaHistory && <StatsSection title="Análises de DNA" icon={<Dna className="size-4" />} statuses={STATUS_ORDER} counts={dnaCounts} />}
+      {hasRnaHistory && <StatsSection title="Processamento de pré-mRNA" icon={<Scissors className="size-4" />} statuses={RNA_STATUS_ORDER} counts={rnaCounts} />}
 
       <div className="mt-10 overflow-hidden rounded-2xl border border-border bg-card shadow-panel">
         {loading ? (
@@ -251,18 +252,25 @@ function Historico() {
         ) : (
           <>
             <Table>
-              <TableHeader><TableRow className="bg-muted/60"><TableHead className="w-16">#</TableHead><TableHead>Status</TableHead><TableHead>Detalhes</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow className="bg-muted/60"><TableHead className="w-16">#</TableHead><TableHead>Tipo</TableHead><TableHead>Status</TableHead><TableHead>Detalhes</TableHead></TableRow></TableHeader>
               <TableBody>
-                {error && <TableRow><TableCell colSpan={3} className="py-8 text-center text-sm text-destructive">{error}</TableCell></TableRow>}
-                {rows.length === 0 && !loading && !error && <TableRow><TableCell colSpan={3} className="py-12 text-center text-sm text-muted-foreground">Nenhuma análise registrada ainda.</TableCell></TableRow>}
+                {error && <TableRow><TableCell colSpan={4} className="py-8 text-center text-sm text-destructive">{error}</TableCell></TableRow>}
+                {rows.length === 0 && !loading && !error && <TableRow><TableCell colSpan={4} className="py-12 text-center text-sm text-muted-foreground">Nenhuma análise registrada ainda.</TableCell></TableRow>}
                 {rows.map((record, i) => {
                   const status = mapBackendStatus(record.resultType);
+                  const sequenceType = getSequenceType(record);
                   return (
                     <TableRow key={record.id} tabIndex={0} role="link"
                       onClick={() => navigate({ to: "/analise/$id", params: { id: record.id } })}
                       onKeyDown={(e) => { if (e.key === "Enter") void navigate({ to: "/analise/$id", params: { id: record.id } }); }}
                       className="cursor-pointer transition-colors hover:bg-secondary/10">
                       <TableCell className="font-mono text-xs">{records.totalElements - ((current - 1) * PAGE_SIZE + i)}</TableCell>
+                      <TableCell>
+                        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", sequenceType === "DNA" ? "bg-secondary/10 text-secondary" : "bg-ok/15 text-ok")}>
+                          {sequenceType === "DNA" ? <Dna className="size-3.5" /> : <Scissors className="size-3.5" />}
+                          {sequenceType === "DNA" ? "DNA" : "pré-mRNA"}
+                        </span>
+                      </TableCell>
                       <TableCell><SeverityBadge status={status} /></TableCell>
                       <TableCell className="text-sm text-muted-foreground">{record.message ?? STATUS_META[status].label}</TableCell>
                     </TableRow>
@@ -284,4 +292,37 @@ function Historico() {
     </main>
   </div>
 );
+}
+
+function StatsSection({
+  title,
+  icon,
+  statuses,
+  counts,
+}: {
+  title: string;
+  icon: ReactNode;
+  statuses: AnalysisStatus[];
+  counts: Record<AnalysisStatus, number>;
+}) {
+  return (
+    <section className="mt-8">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span className="text-secondary">{icon}</span>
+        {title}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {statuses.map((status) => {
+          const meta = STATUS_META[status];
+          const tone = meta.tone === "ok" ? "text-ok" : meta.tone === "warn" ? "text-warn" : "text-destructive";
+          return (
+            <div key={status} className="rounded-2xl border border-border bg-card p-5 shadow-panel">
+              <p className="text-sm text-muted-foreground">{meta.label}</p>
+              <StatNumber value={counts[status]} tone={tone} />
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }

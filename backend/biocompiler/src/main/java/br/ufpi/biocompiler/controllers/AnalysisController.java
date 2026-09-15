@@ -10,6 +10,7 @@ import br.ufpi.biocompiler.dto.AnalysisResponse;
 import br.ufpi.biocompiler.dto.AnalysisStatisticsResponse;
 import br.ufpi.biocompiler.models.Analysis;
 import br.ufpi.biocompiler.models.ResultType;
+import br.ufpi.biocompiler.models.SequenceType;
 import br.ufpi.biocompiler.services.AnalysisExportService;
 import br.ufpi.biocompiler.services.BioCompilerService;
 import br.ufpi.biocompiler.services.DNAFileReaderService;
@@ -92,23 +93,41 @@ public class AnalysisController {
     @GetMapping("/history/stats")
     public ResponseEntity<AnalysisStatisticsResponse> getStatistics(@RequestParam UUID sessionId) {
 
-        Map<ResultType, Long> stats = bioCompilerService.getStatistics(sessionId);
+        Map<SequenceType, Map<ResultType, Long>> statsBySequenceType = bioCompilerService
+            .getStatisticsBySequenceType(sessionId);
+        Map<ResultType, Long> dnaStats = statsBySequenceType.getOrDefault(SequenceType.DNA, Map.of());
+        Map<ResultType, Long> rnaStats = statsBySequenceType.getOrDefault(SequenceType.PRE_MRNA, Map.of());
 
-        long correct = stats.getOrDefault(ResultType.CORRECT, 0L);
-        long invalidBase = stats.getOrDefault(ResultType.INVALID_BASE, 0L);
-        long startMissing = stats.getOrDefault(ResultType.START_CODON_NOT_FOUND, 0L);
-        long stopMissing = stats.getOrDefault(ResultType.STOP_CODON_NOT_FOUND, 0L);
-        long frameShift = stats.getOrDefault(ResultType.FRAME_SHIFT, 0L);
-        long nonsense = stats.getOrDefault(ResultType.NONSENSE_MUTATION, 0L);
+        long dnaCorrect = dnaStats.getOrDefault(ResultType.CORRECT, 0L);
+        long rnaCorrect = rnaStats.getOrDefault(ResultType.CORRECT, 0L);
+        long invalidBase = dnaStats.getOrDefault(ResultType.INVALID_BASE, 0L);
+        long rnaInvalidBase = rnaStats.getOrDefault(ResultType.INVALID_BASE, 0L);
+        long startMissing = dnaStats.getOrDefault(ResultType.START_CODON_NOT_FOUND, 0L);
+        long stopMissing = dnaStats.getOrDefault(ResultType.STOP_CODON_NOT_FOUND, 0L);
+        long frameShift = dnaStats.getOrDefault(ResultType.FRAME_SHIFT, 0L);
+        long nonsense = dnaStats.getOrDefault(ResultType.NONSENSE_MUTATION, 0L);
+        long fivePrimeSite = rnaStats.getOrDefault(ResultType.FIVE_PRIME_SITE_ERROR, 0L);
+        long branchPoint = rnaStats.getOrDefault(ResultType.BRANCH_POINT_ERROR, 0L);
+        long threePrimeSite = rnaStats.getOrDefault(ResultType.THREE_PRIME_SITE_ERROR, 0L);
+        long incompleteIntron = rnaStats.getOrDefault(ResultType.INCOMPLETE_INTRON, 0L);
+        long alternativeSplicing = rnaStats.getOrDefault(ResultType.ALTERNATIVE_SPLICING, 0L);
 
         return ResponseEntity.ok(
             new AnalysisStatisticsResponse(
-                correct,
+                dnaCorrect + rnaCorrect,
                 invalidBase,
                 startMissing,
                 stopMissing,
                 frameShift,
-                nonsense
+                nonsense,
+                dnaCorrect,
+                rnaCorrect,
+                rnaInvalidBase,
+                fivePrimeSite,
+                branchPoint,
+                threePrimeSite,
+                incompleteIntron,
+                alternativeSplicing
             )
         );
     }

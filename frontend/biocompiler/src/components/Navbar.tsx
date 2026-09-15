@@ -33,7 +33,7 @@ export function Navbar() {
             <Dna className="size-5" />
           </span>
           <span className="font-display text-lg font-semibold tracking-tight">
-            <span className="text-secondary">Bio</span>Compiler <span className="text-secondary">1.0</span>
+            <span className="text-secondary">Bio</span>Compiler <span className="text-secondary">2.0</span>
           </span>
         </Link>
 
