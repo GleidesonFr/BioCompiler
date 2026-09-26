@@ -8,11 +8,17 @@ public class SequenceTypeDetector {
     
     public SequenceType detect(String sequence) {
 
-        if (sequence == null || sequence.isBlank()) {
+        String normalizedSequence = normalize(sequence);
+
+        if (normalizedSequence == null || normalizedSequence.isBlank()) {
             throw new IllegalArgumentException("A sequência não pode ser nula ou vazia.");
         }
 
-        String normalizedSequence = sequence.toUpperCase();
+        if (isMatureMrna(normalizedSequence)) {
+            return SequenceType.MATURE_MRNA;
+        }
+
+        normalizedSequence = normalizedSequence.toUpperCase();
         boolean containsT = normalizedSequence.contains("T");
         boolean containsU = normalizedSequence.contains("U");
 
@@ -28,6 +34,28 @@ public class SequenceTypeDetector {
             return SequenceType.PRE_MRNA;
         }
 
-        throw new IllegalArgumentException("Não foi possível identificar a sequência como DNA ou pré-mRNA.");
+        throw new IllegalArgumentException("Não foi possível identificar a sequência como DNA, pré-mRNA ou mRNA maduro.");
+    }
+
+    String normalize(String sequence) {
+        return sequence == null ? null : sequence.replaceAll("\\s+", "");
+    }
+
+    private boolean isMatureMrna(String sequence) {
+        if (sequence == null) {
+            return false;
+        }
+
+        String trimmed = sequence.toUpperCase();
+
+        boolean hasCap = trimmed.startsWith("M7GPPP");
+
+        int trailingAs = 0;
+        int len = trimmed.length();
+        while (trailingAs < len && trimmed.charAt(len - 1 - trailingAs) == 'A') {
+            trailingAs++;
+        }
+        boolean hasPolyA = (trailingAs >= 100);
+        return hasCap || hasPolyA;
     }
 }

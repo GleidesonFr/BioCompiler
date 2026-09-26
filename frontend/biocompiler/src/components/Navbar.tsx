@@ -26,14 +26,14 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95">
       <nav className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-5">
         <Link to="/" className="group flex items-center gap-2.5">
           <span className="flex size-9 items-center justify-center rounded-xl border border-secondary/40 bg-gradient-to-br from-secondary/20 via-primary/10 to-ok/15 text-secondary shadow-glow">
             <Dna className="size-5" />
           </span>
           <span className="font-display text-lg font-semibold tracking-tight">
-            <span className="text-secondary">Bio</span>Compiler <span className="text-secondary">2.0</span>
+            <span className="text-secondary">Bio</span>Compiler <span className="text-secondary">3.0</span>
           </span>
         </Link>
 

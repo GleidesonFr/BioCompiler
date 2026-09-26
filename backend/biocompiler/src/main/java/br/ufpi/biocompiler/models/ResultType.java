@@ -14,7 +14,10 @@ public enum ResultType {
     BRANCH_POINT_ERROR("BUG - branch point"),
     THREE_PRIME_SITE_ERROR("BUG - sítio 3'"),
     INCOMPLETE_INTRON("BUG - íntron incompleto"),
-    ALTERNATIVE_SPLICING("AMBÍGUO - splicing alternativo");
+    ALTERNATIVE_SPLICING("AMBÍGUO - splicing alternativo"),
+    CAP_5_ERROR("BUG - CAP 5'"),
+    POLY_A_ERROR("BUG - cauda poli-A"),
+    READING_FRAME_ERROR("BUG - quadro de leitura");
 
     private final String description;
 

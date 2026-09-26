@@ -11,14 +11,22 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    # 🌟 CORREÇÃO 1: Adiciona o teste de saúde do banco
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend/biocompiler
       dockerfile: Dockerfile
     container_name: biocompiler-backend
+    # 🌟 CORREÇÃO 2: Só inicia o backend quando o postgres estiver 100% pronto
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
@@ -26,6 +34,12 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
       PORT: ${BACKEND_PORT}
       SERVER_PORT: ${BACKEND_PORT}
+      
+      # 🌟 ADICIONE ESTAS CONFIGURAÇÕES DO HIKARI POOL:
+      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: 600000        # 10 minutos em milissegundos
+      SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: 300000        # 5 minutos em milissegundos
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 2
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 10
     ports:
       - "${BACKEND_PORT}:8080"
     restart: unless-stopped

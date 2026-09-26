@@ -1,6 +1,8 @@
 package br.ufpi.biocompiler.config;
 
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
@@ -8,6 +10,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import br.ufpi.biocompiler.models.ResultType;
 import jakarta.annotation.PostConstruct;
 
 @Component
@@ -45,24 +48,18 @@ public class DatabaseMigrationService {
     }
 
     private void updateResultTypeConstraint() {
-        jdbcTemplate.execute("ALTER TABLE analyses DROP CONSTRAINT IF EXISTS analyses_result_type_check");
-        jdbcTemplate.execute(
-            """
+        jdbcTemplate.execute(buildResultTypeConstraintSql());
+    }
+
+    static String buildResultTypeConstraintSql() {
+        String allowedValues = Arrays.stream(ResultType.values())
+            .map(resultType -> "'" + resultType.name() + "'")
+            .collect(Collectors.joining(", "));
+
+        return """
             ALTER TABLE analyses
-            ADD CONSTRAINT analyses_result_type_check CHECK (result_type IN (
-                'CORRECT',
-                'INVALID_BASE',
-                'START_CODON_NOT_FOUND',
-                'STOP_CODON_NOT_FOUND',
-                'FRAME_SHIFT',
-                'NONSENSE_MUTATION',
-                'FIVE_PRIME_SITE_ERROR',
-                'BRANCH_POINT_ERROR',
-                'THREE_PRIME_SITE_ERROR',
-                'INCOMPLETE_INTRON',
-                'ALTERNATIVE_SPLICING'
-            ))
-            """
-        );
+            DROP CONSTRAINT IF EXISTS analyses_result_type_check,
+            ADD CONSTRAINT analyses_result_type_check CHECK (result_type IN (%s))
+            """.formatted(allowedValues);
     }
 }

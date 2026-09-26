@@ -2,5 +2,6 @@ package br.ufpi.biocompiler.models;
 
 public enum SequenceType {
     DNA,
-    PRE_MRNA
+    PRE_MRNA,
+    MATURE_MRNA
 }

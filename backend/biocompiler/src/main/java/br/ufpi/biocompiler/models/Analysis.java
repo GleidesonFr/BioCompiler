@@ -61,6 +61,9 @@ public class Analysis {
     @Column(name = "mature_mrna", length = 10000)
     private String matureMrna;
 
+    @Column(name = "protein", length = 10000)
+    private String protein;
+
     @Column(length = 1000)
     private String message;
 

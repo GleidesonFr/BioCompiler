@@ -47,6 +47,12 @@ export interface HistoryStats {
   threePrimeSite: number;
   incompleteIntron: number;
   alternativeSplicing: number;
+  ribosomeCorrect?: number;
+  cap5Error?: number;
+  polyAError?: number;
+  readingFrameError?: number;
+  ribosomeStartMissing?: number;
+  ribosomeStopMissing?: number;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {

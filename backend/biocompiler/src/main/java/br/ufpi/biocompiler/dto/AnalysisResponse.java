@@ -19,6 +19,7 @@ public record AnalysisResponse(
     String codingRegion,
     String preMrna,
     String matureMrna,
+    String protein,
     String message,
     LocalDateTime analysisDate
 ){
@@ -34,6 +35,7 @@ public record AnalysisResponse(
             analysis.getCodingRegion(),
             analysis.getPreMrna(),
             analysis.getMatureMrna(),
+            analysis.getProtein(),
             analysis.getMessage(),
             analysis.getAnalysisDate()
         );

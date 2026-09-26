@@ -12,16 +12,16 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BioCompiler — Análise de DNA e pré-mRNA" },
+      { title: "BioCompiler — Análise de DNA, pré-mRNA e mRNA maduro" },
       {
         name: "description",
         content:
-          "Analise sequências de DNA e pré-mRNA por texto ou arquivo, com validação didática de transcrição e splicing.",
+          "Analise sequências de DNA, pré-mRNA e mRNA maduro por texto ou arquivo, com validação didática de transcrição, splicing e tradução ribossomal.",
       },
-      { property: "og:title", content: "BioCompiler — Análise de DNA e pré-mRNA" },
+      { property: "og:title", content: "BioCompiler — Análise de DNA, pré-mRNA e mRNA maduro" },
       {
         property: "og:description",
-        content: "Valide sequências de DNA e pré-mRNA por texto ou arquivo em segundos.",
+        content: "Valide sequências de DNA, pré-mRNA e mRNA maduro por texto ou arquivo em segundos.",
       },
     ],
   }),
@@ -87,11 +87,11 @@ function Index() {
             <Sparkles className="size-3.5" /> Compilador genético
           </span>
           <h1 className="mt-5 text-4xl font-semibold sm:text-5xl">
-            Analise DNA ou pré-mRNA
+            Analise DNA, pré-mRNA ou mRNA maduro
           </h1>
           <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
             Cole a sequência ou envie um arquivo. O BioCompiler identifica o tipo e aplica
-            transcrição de DNA ou splicing e maturação de pré-mRNA.
+            transcrição de DNA, splicing de pré-mRNA ou tradução ribossomal de mRNA maduro.
           </p>
         </div>
 
@@ -143,7 +143,7 @@ function Index() {
                 {file ? file.name : "Clique para escolher um arquivo CSV ou TXT"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Envie um arquivo com uma sequência de DNA ou pré-mRNA por linha
+                Envie um arquivo com uma sequência de DNA, pré-mRNA ou mRNA maduro por linha
               </p>
               <Input
                 ref={inputRef}
@@ -158,7 +158,7 @@ function Index() {
               key="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG... ou CCUAUGGCUGUAACCUUUAACUAACAAGAUGGCCUAC"
+              placeholder="DNA: ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG...&#10;pré-mRNA: CCUAUGGCUGUAACCUUUAACUAACAAGAUGGCCUAC...&#10;mRNA maduro: m7GpppAUGGCCAUUGUAAUGGGCC...A(100)"
               className="animate-field-left min-h-44 resize-y font-mono text-sm tracking-wider"
             />
           )}

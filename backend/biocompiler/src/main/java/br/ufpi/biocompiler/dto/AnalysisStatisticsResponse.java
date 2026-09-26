@@ -14,5 +14,11 @@ public record AnalysisStatisticsResponse(
     long branchPoint,
     long threePrimeSite,
     long incompleteIntron,
-    long alternativeSplicing
+    long alternativeSplicing,
+    long ribosomeCorrect,
+    long cap5Error,
+    long polyAError,
+    long readingFrameError,
+    long ribosomeStartMissing,
+    long ribosomeStopMissing
 ) {}

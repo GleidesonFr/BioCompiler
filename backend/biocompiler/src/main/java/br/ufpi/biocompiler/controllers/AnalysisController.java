@@ -97,24 +97,34 @@ public class AnalysisController {
             .getStatisticsBySequenceType(sessionId);
         Map<ResultType, Long> dnaStats = statsBySequenceType.getOrDefault(SequenceType.DNA, Map.of());
         Map<ResultType, Long> rnaStats = statsBySequenceType.getOrDefault(SequenceType.PRE_MRNA, Map.of());
+        Map<ResultType, Long> ribosomeStats = statsBySequenceType.getOrDefault(SequenceType.MATURE_MRNA, Map.of());
 
         long dnaCorrect = dnaStats.getOrDefault(ResultType.CORRECT, 0L);
         long rnaCorrect = rnaStats.getOrDefault(ResultType.CORRECT, 0L);
+        long ribosomeCorrect = ribosomeStats.getOrDefault(ResultType.CORRECT, 0L);
+
         long invalidBase = dnaStats.getOrDefault(ResultType.INVALID_BASE, 0L);
         long rnaInvalidBase = rnaStats.getOrDefault(ResultType.INVALID_BASE, 0L);
         long startMissing = dnaStats.getOrDefault(ResultType.START_CODON_NOT_FOUND, 0L);
         long stopMissing = dnaStats.getOrDefault(ResultType.STOP_CODON_NOT_FOUND, 0L);
         long frameShift = dnaStats.getOrDefault(ResultType.FRAME_SHIFT, 0L);
         long nonsense = dnaStats.getOrDefault(ResultType.NONSENSE_MUTATION, 0L);
+
         long fivePrimeSite = rnaStats.getOrDefault(ResultType.FIVE_PRIME_SITE_ERROR, 0L);
         long branchPoint = rnaStats.getOrDefault(ResultType.BRANCH_POINT_ERROR, 0L);
         long threePrimeSite = rnaStats.getOrDefault(ResultType.THREE_PRIME_SITE_ERROR, 0L);
         long incompleteIntron = rnaStats.getOrDefault(ResultType.INCOMPLETE_INTRON, 0L);
         long alternativeSplicing = rnaStats.getOrDefault(ResultType.ALTERNATIVE_SPLICING, 0L);
 
+        long cap5Error = ribosomeStats.getOrDefault(ResultType.CAP_5_ERROR, 0L);
+        long polyAError = ribosomeStats.getOrDefault(ResultType.POLY_A_ERROR, 0L);
+        long readingFrameError = ribosomeStats.getOrDefault(ResultType.READING_FRAME_ERROR, 0L);
+        long ribosomeStartMissing = ribosomeStats.getOrDefault(ResultType.START_CODON_NOT_FOUND, 0L);
+        long ribosomeStopMissing = ribosomeStats.getOrDefault(ResultType.STOP_CODON_NOT_FOUND, 0L);
+
         return ResponseEntity.ok(
             new AnalysisStatisticsResponse(
-                dnaCorrect + rnaCorrect,
+                dnaCorrect + rnaCorrect + ribosomeCorrect,
                 invalidBase,
                 startMissing,
                 stopMissing,
@@ -127,7 +137,13 @@ public class AnalysisController {
                 branchPoint,
                 threePrimeSite,
                 incompleteIntron,
-                alternativeSplicing
+                alternativeSplicing,
+                ribosomeCorrect,
+                cap5Error,
+                polyAError,
+                readingFrameError,
+                ribosomeStartMissing,
+                ribosomeStopMissing
             )
         );
     }

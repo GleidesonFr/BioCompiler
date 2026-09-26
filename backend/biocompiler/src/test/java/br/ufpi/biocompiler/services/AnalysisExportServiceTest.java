@@ -54,11 +54,29 @@ class AnalysisExportServiceTest {
         analysis.setSequenceType(sequenceType);
         analysis.setResultType(ResultType.CORRECT);
         analysis.setMessage("Sequência correta");
-        if (sequenceType == SequenceType.PRE_MRNA) {
+        if (sequenceType == SequenceType.MATURE_MRNA) {
+            analysis.setProtein(processedSequence);
+        } else if (sequenceType == SequenceType.PRE_MRNA) {
             analysis.setMatureMrna(processedSequence);
         } else {
             analysis.setPreMrna(processedSequence);
         }
         return analysis;
+    }
+
+    @Test
+    void shouldExportProteinForRibosomeOnlyHistory() throws Exception {
+        Analysis ribosome = analysis(SequenceType.MATURE_MRNA, "Met-Ala-Lys-Pro");
+
+        String content = new String(
+            analysisExportService.generateTxT(List.of(ribosome)).getContentAsByteArray(),
+            StandardCharsets.UTF_8
+        );
+
+        assertEquals(
+            "linha;status;resultado;proteina\n"
+                + "1;OK;CORRETO;Met-Ala-Lys-Pro\n",
+            content
+        );
     }
 }

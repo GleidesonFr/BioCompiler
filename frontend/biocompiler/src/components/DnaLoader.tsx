@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
-const SEGMENTS = 14;
+const SEGMENTS = 10;
 
 export function DnaHelix({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center gap-[5px]", className)} aria-hidden>
+    <div className={cn("dna-loader flex items-center gap-[5px]", className)} aria-hidden>
       {Array.from({ length: SEGMENTS }).map((_, i) => (
         <div key={i} className="flex flex-col items-center gap-[3px]">
           <span
@@ -36,7 +36,7 @@ export function DnaLoader({ label = "Carregando...", className }: { label?: stri
 
 export function DnaLoaderOverlay({ label = "Carregando..." }: { label?: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 animate-fade-in">
       <DnaLoader label={label} />
     </div>
   );

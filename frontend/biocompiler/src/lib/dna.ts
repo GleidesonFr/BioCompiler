@@ -9,9 +9,12 @@ export type AnalysisStatus =
   | "branch_point"
   | "three_prime_site"
   | "incomplete_intron"
-  | "alternative_splicing";
+  | "alternative_splicing"
+  | "cap_5_error"
+  | "poly_a_error"
+  | "reading_frame_error";
 
-export type SequenceType = "DNA" | "PRE_MRNA";
+export type SequenceType = "DNA" | "PRE_MRNA" | "MATURE_MRNA";
 
 export type Severity = "aprovado" | "alerta" | "erro";
 
@@ -30,6 +33,9 @@ export const STATUS_META: Record<
   three_prime_site: { label: "Sítio 3' ausente", short: "Sítio 3'", tone: "bad", severity: "erro" },
   incomplete_intron: { label: "Íntron incompleto", short: "Íntron incompleto", tone: "warn", severity: "alerta" },
   alternative_splicing: { label: "Splicing alternativo", short: "Splicing alternativo", tone: "warn", severity: "alerta" },
+  cap_5_error: { label: "BUG - CAP 5'", short: "CAP 5'", tone: "bad", severity: "erro" },
+  poly_a_error: { label: "BUG - cauda poli-A", short: "Cauda poli-A", tone: "bad", severity: "erro" },
+  reading_frame_error: { label: "BUG - quadro de leitura", short: "Quadro de leitura", tone: "bad", severity: "erro" },
 };
 
 export const STATUS_ORDER: AnalysisStatus[] = [
@@ -51,6 +57,16 @@ export const RNA_STATUS_ORDER: AnalysisStatus[] = [
   "alternative_splicing",
 ];
 
+export const RIBOSOME_STATUS_ORDER: AnalysisStatus[] = [
+  "ok",
+  "cap_5_error",
+  "start_missing",
+  "stop_missing",
+  "reading_frame_error",
+  "poly_a_error",
+  "invalid_base",
+];
+
 export interface BackendAnalysis {
   id: string;
   originalSequence: string;
@@ -62,6 +78,7 @@ export interface BackendAnalysis {
   codingRegion: string | null;
   preMrna: string | null;
   matureMrna?: string | null;
+  protein?: string | null;
   message: string | null;
   analysisDate: string;
 }
@@ -79,6 +96,9 @@ export function mapBackendStatus(resultType: string): AnalysisStatus {
     case "THREE_PRIME_SITE_ERROR": return "three_prime_site";
     case "INCOMPLETE_INTRON": return "incomplete_intron";
     case "ALTERNATIVE_SPLICING": return "alternative_splicing";
+    case "CAP_5_ERROR": return "cap_5_error";
+    case "POLY_A_ERROR": return "poly_a_error";
+    case "READING_FRAME_ERROR": return "reading_frame_error";
     default: return "invalid_base";
   }
 }
@@ -100,13 +120,18 @@ export interface SequenceDetail {
   codingEnd: number | null;
   preMrna: string | null;
   matureMrna: string | null;
+  protein: string | null;
 }
 
 export function getSequenceType(analysis: BackendAnalysis): SequenceType {
-  if (analysis.sequenceType === "PRE_MRNA" || analysis.sequenceType === "DNA") {
+  if (analysis.sequenceType === "PRE_MRNA" || analysis.sequenceType === "DNA" || analysis.sequenceType === "MATURE_MRNA") {
     return analysis.sequenceType;
   }
-  return analysis.originalSequence?.toUpperCase().includes("U") ? "PRE_MRNA" : "DNA";
+  const raw = analysis.originalSequence ?? "";
+  if (raw.startsWith("m7Gppp") || raw.toUpperCase().startsWith("M7GPPP") || raw.toUpperCase().endsWith("A".repeat(20))) {
+    return "MATURE_MRNA";
+  }
+  return raw.toUpperCase().includes("U") ? "PRE_MRNA" : "DNA";
 }
 
 export function normalizeSequence(raw: string): string {
@@ -115,8 +140,7 @@ export function normalizeSequence(raw: string): string {
     .split("\n")
     .filter((line) => !line.trim().startsWith(">"))
     .join("")
-    .replace(/\s/g, "")
-    .toUpperCase();
+    .replace(/\s/g, "");
 }
 
 export function buildDetail(analysis: BackendAnalysis): SequenceDetail {
@@ -124,10 +148,14 @@ export function buildDetail(analysis: BackendAnalysis): SequenceDetail {
   const sequenceType = getSequenceType(analysis);
   const status = mapBackendStatus(analysis.resultType);
   const gcContent = sequence.length
-    ? Math.round(((sequence.match(/[GC]/g)?.length ?? 0) / sequence.length) * 1000) / 10
+    ? Math.round(((sequence.toUpperCase().match(/[GC]/g)?.length ?? 0) / sequence.length) * 1000) / 10
     : 0;
 
-  const invalid = sequence.match(sequenceType === "DNA" ? /[^ACGT]/ : /[^ACGU]/);
+  const checkSeq = sequenceType === "MATURE_MRNA"
+    ? sequence.replace(/^m7Gppp/i, "").replace(/A+$/, "").toUpperCase()
+    : sequence.toUpperCase();
+
+  const invalid = checkSeq.match(sequenceType === "DNA" ? /[^ACGT]/ : /[^ACGU]/);
   const startIndex = analysis.positionStart ?? null;
   const stopIndex = analysis.positionStop ?? null;
   const frameStarts: number[] = [];
@@ -157,5 +185,6 @@ export function buildDetail(analysis: BackendAnalysis): SequenceDetail {
     codingEnd: analysis.codingRegion && stopIndex !== null ? stopIndex + 3 : null,
     preMrna: analysis.preMrna ?? null,
     matureMrna: analysis.matureMrna ?? null,
+    protein: analysis.protein ?? null,
   };
 }

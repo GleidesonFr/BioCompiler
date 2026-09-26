@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Dna, Download, LoaderCircle, Scissors, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Dna, Download, FlaskConical, LoaderCircle, Scissors, Trash2 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { SeverityBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getSequenceType, mapBackendStatus, RNA_STATUS_ORDER, STATUS_META, STATUS_ORDER, type AnalysisStatus } from "@/lib/dna";
+import { getSequenceType, mapBackendStatus, RIBOSOME_STATUS_ORDER, RNA_STATUS_ORDER, STATUS_META, STATUS_ORDER, type AnalysisStatus } from "@/lib/dna";
 import { API } from "@/lib/api";
 import { useHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,12 @@ const EMPTY_STATS = {
   threePrimeSite: 0,
   incompleteIntron: 0,
   alternativeSplicing: 0,
+  ribosomeCorrect: 0,
+  cap5Error: 0,
+  polyAError: 0,
+  readingFrameError: 0,
+  ribosomeStartMissing: 0,
+  ribosomeStopMissing: 0,
 };
 
 export const Route = createFileRoute("/historico")({
@@ -53,11 +59,18 @@ export const Route = createFileRoute("/historico")({
 
 function StatNumber({ value, tone }: { value: number; tone: string }) {
   const [displayValue, setDisplayValue] = useState(0);
+  const displayValueRef = useRef(0);
 
   useEffect(() => {
-    const start = displayValue;
+    const start = displayValueRef.current;
     const end = value;
     if (start === end) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      displayValueRef.current = end;
+      setDisplayValue(end);
+      return;
+    }
 
     let rafId = 0;
     const duration = 700;
@@ -68,6 +81,7 @@ function StatNumber({ value, tone }: { value: number; tone: string }) {
       const progress = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 4);
       const nextValue = Math.round(start + (end - start) * eased);
+      displayValueRef.current = nextValue;
       setDisplayValue(nextValue);
 
       if (progress < 1) {
@@ -138,8 +152,21 @@ function Historico() {
     return base;
   }, [stats]);
 
+  const ribosomeCounts = useMemo(() => {
+    const base = Object.fromEntries(RIBOSOME_STATUS_ORDER.map((s) => [s, 0])) as Record<AnalysisStatus, number>;
+    base.ok = stats.ribosomeCorrect ?? 0;
+    base.cap_5_error = stats.cap5Error ?? 0;
+    base.start_missing = stats.ribosomeStartMissing ?? 0;
+    base.stop_missing = stats.ribosomeStopMissing ?? 0;
+    base.reading_frame_error = stats.readingFrameError ?? 0;
+    base.poly_a_error = stats.polyAError ?? 0;
+    base.invalid_base = 0;
+    return base;
+  }, [stats]);
+
   const hasDnaHistory = STATUS_ORDER.some((status) => dnaCounts[status] > 0);
   const hasRnaHistory = RNA_STATUS_ORDER.some((status) => rnaCounts[status] > 0);
+  const hasRibosomeHistory = RIBOSOME_STATUS_ORDER.some((status) => ribosomeCounts[status] > 0);
 
   useEffect(() => {
     if (records.totalPages > 0 && page > records.totalPages) {
@@ -243,8 +270,9 @@ function Historico() {
 
       {hasDnaHistory && <StatsSection title="Análises de DNA" icon={<Dna className="size-4" />} statuses={STATUS_ORDER} counts={dnaCounts} />}
       {hasRnaHistory && <StatsSection title="Processamento de pré-mRNA" icon={<Scissors className="size-4" />} statuses={RNA_STATUS_ORDER} counts={rnaCounts} />}
+      {hasRibosomeHistory && <StatsSection title="Tradução Ribossomal" icon={<FlaskConical className="size-4" />} statuses={RIBOSOME_STATUS_ORDER} counts={ribosomeCounts} />}
 
-      <div className="mt-10 overflow-hidden rounded-2xl border border-border bg-card shadow-panel">
+      <div className="mt-10 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         {loading ? (
           <div className="flex min-h-[220px] items-center justify-center gap-3 py-10">
             <DnaLoader />
@@ -266,9 +294,12 @@ function Historico() {
                       className="cursor-pointer transition-colors hover:bg-secondary/10">
                       <TableCell className="font-mono text-xs">{records.totalElements - ((current - 1) * PAGE_SIZE + i)}</TableCell>
                       <TableCell>
-                        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", sequenceType === "DNA" ? "bg-secondary/10 text-secondary" : "bg-ok/15 text-ok")}>
-                          {sequenceType === "DNA" ? <Dna className="size-3.5" /> : <Scissors className="size-3.5" />}
-                          {sequenceType === "DNA" ? "DNA" : "pré-mRNA"}
+                        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                          sequenceType === "DNA" ? "bg-secondary/10 text-secondary"
+                          : sequenceType === "MATURE_MRNA" ? "bg-warn/10 text-warn"
+                          : "bg-ok/15 text-ok")}>
+                          {sequenceType === "DNA" ? <Dna className="size-3.5" /> : sequenceType === "MATURE_MRNA" ? <FlaskConical className="size-3.5" /> : <Scissors className="size-3.5" />}
+                          {sequenceType === "DNA" ? "DNA" : sequenceType === "MATURE_MRNA" ? "mRNA maduro" : "pré-mRNA"}
                         </span>
                       </TableCell>
                       <TableCell><SeverityBadge status={status} /></TableCell>
@@ -316,7 +347,7 @@ function StatsSection({
           const meta = STATUS_META[status];
           const tone = meta.tone === "ok" ? "text-ok" : meta.tone === "warn" ? "text-warn" : "text-destructive";
           return (
-            <div key={status} className="rounded-2xl border border-border bg-card p-5 shadow-panel">
+            <div key={status} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <p className="text-sm text-muted-foreground">{meta.label}</p>
               <StatNumber value={counts[status]} tone={tone} />
             </div>

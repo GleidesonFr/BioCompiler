@@ -20,6 +20,9 @@ public class AnalysisMessageService {
             case THREE_PRIME_SITE_ERROR -> "BUG - sítio 3'";
             case INCOMPLETE_INTRON -> "BUG - íntron incompleto";
             case ALTERNATIVE_SPLICING -> "AMBÍGUO - splicing alternativo";
+            case CAP_5_ERROR -> "BUG - CAP 5'";
+            case POLY_A_ERROR -> "BUG - cauda poli-A";
+            case READING_FRAME_ERROR -> "BUG - quadro de leitura";
         };
     }
 }

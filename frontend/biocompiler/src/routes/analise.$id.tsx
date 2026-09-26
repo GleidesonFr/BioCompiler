@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowDown, ArrowLeft, Scissors } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowLeft, FlaskConical, Scissors } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { SeverityBadge, StatusPill } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,7 @@ function AnalisePage() {
               <div className="min-w-0">
                 <h1 className="truncate text-3xl font-semibold">Análise #{detail.analysis.id}</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {new Date(detail.analysis.analysisDate).toLocaleString("pt-BR")} · {detail.sequence.length} bases · {detail.sequenceType === "DNA" ? `GC ${detail.gcContent}%` : "pré-mRNA"}
+                  {new Date(detail.analysis.analysisDate).toLocaleString("pt-BR")} · {detail.sequence.length} bases · {detail.sequenceType === "DNA" ? `GC ${detail.gcContent}%` : detail.sequenceType === "MATURE_MRNA" ? "mRNA maduro" : "pré-mRNA"}
                 </p>
               </div>
             </header>
@@ -77,6 +77,8 @@ function AnalisePage() {
                 <Info label="Resultado">{STATUS_META[detail.status].label}</Info>
                 <Info label="Mensagem">{detail.analysis.message ?? "—"}</Info>
               </section>
+            ) : detail.sequenceType === "MATURE_MRNA" ? (
+              <MatureMrnaInfo detail={detail} />
             ) : (
               <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label="Processamento">Splicing e maturação</Info>
@@ -87,7 +89,7 @@ function AnalisePage() {
               </section>
             )}
 
-            {detail.sequenceType === "DNA" ? <SequenceViewer detail={detail} /> : <RnaSequenceViewer detail={detail} />}
+            {detail.sequenceType === "DNA" ? <SequenceViewer detail={detail} /> : detail.sequenceType === "MATURE_MRNA" ? <RibosomeViewer detail={detail} /> : <RnaSequenceViewer detail={detail} />}
           </>
         )}
       </main>
@@ -100,6 +102,47 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 font-display text-sm font-semibold">{children}</p>
     </div>
+  );
+}
+
+const MRNA_CAP = "m7Gppp";
+const STOP_CODONS = ["UAA", "UAG", "UGA"];
+
+function splitMatureMrna(sequence: string) {
+  const hasCap = sequence.startsWith(MRNA_CAP);
+  const polyAMatch = sequence.match(/A+$/i);
+  const polyALength = polyAMatch?.[0].length ?? 0;
+  const bodyStart = hasCap ? MRNA_CAP.length : 0;
+  const bodyEnd = Math.max(bodyStart, sequence.length - polyALength);
+
+  return {
+    hasCap,
+    polyALength,
+    rnaBody: sequence.slice(bodyStart, bodyEnd).toUpperCase(),
+  };
+}
+
+function MatureMrnaInfo({ detail }: { detail: SequenceDetail }) {
+  const { hasCap, polyALength } = splitMatureMrna(detail.sequence);
+  const transcriptionFailed = detail.status === "cap_5_error";
+
+  return (
+    <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <Info label="CAP 5'">{hasCap ? "m7Gppp — presente" : "BUG: ausente ou inválida"}</Info>
+      <Info label="Cauda poli-A">
+        <span className={detail.status === "poly_a_error" ? "text-destructive" : undefined}>
+          {polyALength} adeninas
+        </span>
+      </Info>
+      <Info label="START (AUG)">
+        {transcriptionFailed ? "Falha de transcrição" : detail.startIndex === null ? "Não encontrado" : `posição ${detail.startIndex + 1}`}
+      </Info>
+      <Info label="STOP">
+        {transcriptionFailed ? "Falha de transcrição" : detail.stopIndex === null ? "Não encontrado" : `posição ${detail.stopIndex + 1}`}
+      </Info>
+      <Info label="Resultado">{STATUS_META[detail.status].label}</Info>
+      <Info label="Mensagem">{detail.analysis.message ?? "—"}</Info>
+    </section>
   );
 }
 
@@ -423,6 +466,230 @@ function RnaSequenceViewer({ detail }: { detail: SequenceDetail }) {
           <ArrowDown className="size-5 text-destructive" />
           <p className="mt-2 text-sm font-medium text-destructive">{STATUS_META[status].label}</p>
           <p className="mt-1 text-xs text-muted-foreground">mRNA maduro não gerado.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RibosomeViewer({ detail }: { detail: SequenceDetail }) {
+  const { status, analysis } = detail;
+  const { hasCap, polyALength, rnaBody } = splitMatureMrna(detail.sequence);
+
+  let incompleteFragmentStart: number | null = null;
+  if (status === "reading_frame_error" && detail.startIndex !== null) {
+    const lastStopIndex = Math.max(
+      ...STOP_CODONS.map((stopCodon) => rnaBody.lastIndexOf(stopCodon)),
+    );
+    const candidateStart = lastStopIndex + 3;
+    const fragmentLength = rnaBody.length - candidateStart;
+    if (lastStopIndex > detail.startIndex && fragmentLength > 0 && fragmentLength < 3) {
+      incompleteFragmentStart = candidateStart;
+    }
+  }
+
+  const codons: string[] = [];
+  if (analysis.codingRegion) {
+    const cr = analysis.codingRegion.toUpperCase();
+    for (let i = 0; i + 3 <= cr.length; i += 3) codons.push(cr.slice(i, i + 3));
+  }
+
+  const aminoAcids = analysis.protein ? analysis.protein.split("-") : [];
+  const [revealedCodons, setRevealedCodons] = useState(0);
+  const [scanStep, setScanStep] = useState(0);
+  const [done, setDone] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const isCorrect = status === "ok";
+  const isError = status !== "ok";
+  const isScanningForStart = status === "start_missing";
+  const isScanningForStop = status === "stop_missing" && detail.startIndex !== null;
+  const scanStarts = useMemo(() => {
+    const starts: number[] = [];
+    if (isScanningForStart) {
+      for (let i = 0; i + 3 <= rnaBody.length; i += 3) starts.push(i);
+    } else if (isScanningForStop && detail.startIndex !== null) {
+      for (let i = detail.startIndex; i + 3 <= rnaBody.length; i += 3) starts.push(i);
+    }
+    return starts;
+  }, [detail.startIndex, isScanningForStart, isScanningForStop, rnaBody]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setReduceMotion(mediaQuery.matches);
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    setRevealedCodons(0);
+    setScanStep(0);
+    setDone(false);
+
+    if (reduceMotion) {
+      setRevealedCodons(codons.length);
+      setDone(true);
+      return;
+    }
+
+    if (isScanningForStart || isScanningForStop) {
+      if (scanStarts.length === 0) {
+        const timeout = window.setTimeout(() => setDone(true), 800);
+        return () => window.clearTimeout(timeout);
+      }
+
+      let step = 0;
+      const timer = window.setInterval(() => {
+        step += 1;
+        if (step >= scanStarts.length) {
+          window.clearInterval(timer);
+          setDone(true);
+          return;
+        }
+        setScanStep(step);
+      }, 360);
+      return () => window.clearInterval(timer);
+    }
+
+    if (!isCorrect || codons.length === 0) {
+      const t = window.setTimeout(() => setDone(true), 800);
+      return () => window.clearTimeout(t);
+    }
+    let i = 0;
+    const timer = window.setInterval(() => {
+      i += 1;
+      setRevealedCodons(i);
+      if (i >= codons.length) {
+        window.clearInterval(timer);
+        setDone(true);
+      }
+    }, 320);
+    return () => window.clearInterval(timer);
+  }, [isCorrect, isScanningForStart, isScanningForStop, reduceMotion, analysis.originalSequence, codons.length, scanStarts]);
+
+  const currentScanStart = !done && (isScanningForStart || isScanningForStop)
+    ? scanStarts[scanStep]
+    : undefined;
+
+  const ribosomeMessage = () => {
+    if (status === "ok") return "O ribossomo leu os códons em trincas do AUG ao STOP e sintetizou a proteína.";
+    if (status === "cap_5_error") return "BUG: a sequência não possui a CAP 5' m7Gppp correta. O ribossomo não consegue iniciar.";
+    if (status === "poly_a_error") return "BUG: a cauda poli-A está incorreta (exatamente 100 adeninas são esperadas na extremidade 3').";
+    if (status === "invalid_base") return "BUG: base inválida detectada na região de RNA (esperado A, U, G ou C).";
+    if (status === "start_missing") return "BUG: códon de início AUG não encontrado na sequência de mRNA maduro.";
+    if (status === "stop_missing") return "BUG: códon de parada (UAA, UAG ou UGA) não encontrado na mesma moldura do AUG.";
+    if (status === "reading_frame_error") return "BUG: o quadro de leitura está deslocado — restam bases que não formam uma trinca completa.";
+    return "Visualização da tradução ribossomal.";
+  };
+
+  return (
+    <section className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-panel">
+      <h2 className="text-lg font-semibold">mRNA Maduro — Tradução Ribossomal</h2>
+      <p className="mt-1 text-xs text-muted-foreground">{ribosomeMessage()}</p>
+
+      {/* CAP 5' + RNA body + poly-A */}
+      <div className="mt-5 flex flex-wrap items-center gap-x-[3px] gap-y-2 font-mono text-sm sm:text-base">
+        <span className={cn("rounded-sm px-1 font-semibold", hasCap ? "bg-secondary/20 text-secondary" : "bg-destructive/15 text-destructive blink-soft")}>
+          {hasCap ? "m7Gppp" : "[sem CAP 5']"}
+        </span>
+
+        {rnaBody.split("").map((base, i) => {
+          const startIdx = detail.startIndex;
+          const stopIdx = detail.stopIndex;
+          const codonOffset = startIdx !== null ? i - startIdx : -1;
+          const codonIndex = codonOffset >= 0 ? Math.floor(codonOffset / 3) : -1;
+          const isInCodingRegion = startIdx !== null && stopIdx !== null && i >= startIdx && i < stopIdx + 3;
+          const isStart = startIdx !== null && i >= startIdx && i < startIdx + 3;
+          const isStop = stopIdx !== null && i >= stopIdx && i < stopIdx + 3;
+          const isRevealed = codonIndex >= 0 && codonIndex < revealedCodons;
+          const isIncompleteFrameFragment = incompleteFragmentStart !== null && i >= incompleteFragmentStart;
+          const isCurrentScanTriplet = currentScanStart !== undefined && i >= currentScanStart && i < currentScanStart + 3;
+
+          let cls = "text-foreground/50";
+          if (isCurrentScanTriplet) cls = "text-secondary font-bold bg-secondary/20 rounded-sm";
+          else if (isStop) cls = "text-destructive font-bold bg-destructive/15 rounded-sm";
+          else if (isStart) cls = "text-ok font-bold bg-ok/15 rounded-sm";
+          else if (isInCodingRegion && isRevealed) cls = "text-secondary font-semibold bg-secondary/10 rounded-sm";
+          if (isIncompleteFrameFragment) cls = "text-destructive font-bold bg-destructive/15 rounded-sm blink-soft";
+
+          return (
+            <span key={i} className={cn("px-[1px] transition-colors duration-200", cls)}>{base}</span>
+          );
+        })}
+
+        <span
+          className={cn(
+            "ml-1 rounded-sm px-1 text-xs font-semibold",
+            status === "poly_a_error"
+              ? "bg-destructive/15 text-destructive"
+              : "bg-ok/10 text-ok",
+          )}
+        >
+          poli-A({polyALength})
+        </span>
+      </div>
+
+      {/* Codon / amino-acid table */}
+      {isCorrect && codons.length > 0 && (
+        <div className={cn("mt-8", done ? "animate-fade-in" : "opacity-40")}>
+          <div className="flex items-center gap-2 text-secondary">
+            <FlaskConical className="size-5" />
+            <span className="text-xs font-medium">Tradução: códons → aminoácidos</span>
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <div className="flex gap-1 min-w-max pb-2">
+              {codons.map((codon, idx) => {
+                const aa = aminoAcids[idx] ?? "???";
+                const isStopCodon = ["UAA", "UAG", "UGA"].includes(codon);
+                const revealed = idx < revealedCodons;
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "flex flex-col items-center rounded-lg border px-2 py-1.5 text-center transition-all duration-300",
+                      revealed
+                        ? isStopCodon
+                          ? "border-destructive/30 bg-destructive/10"
+                          : idx === 0
+                          ? "border-ok/30 bg-ok/10"
+                          : "border-secondary/20 bg-secondary/5"
+                        : "border-border bg-muted/30 opacity-30",
+                    )}
+                  >
+                    <span className={cn("font-mono text-xs font-bold", isStopCodon ? "text-destructive" : idx === 0 ? "text-ok" : "text-secondary")}>
+                      {codon}
+                    </span>
+                    <span className="mt-0.5 text-[10px] text-muted-foreground">{aa}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {done && analysis.protein && (
+            <div className="mt-4 rounded-2xl border border-ok/20 bg-ok/5 p-4 animate-fade-in">
+              <p className="text-xs font-medium text-ok">Proteína sintetizada</p>
+              <p className="mt-2 max-h-36 overflow-y-auto break-all font-mono text-sm leading-6 text-foreground/80">
+                {analysis.protein}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+                <span className="rounded-full bg-secondary/15 px-2.5 py-1 font-medium text-secondary">
+                  {aminoAcids.length} aminoácido(s)
+                </span>
+                <span className="rounded-full bg-ok/15 px-2.5 py-1 font-medium text-ok">
+                  {codons.length} códon(s) lido(s)
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isError && done && (
+        <div className="mt-8 flex flex-col items-center text-center animate-fade-in">
+          <ArrowDown className="size-5 text-destructive" />
+          <p className="mt-2 text-sm font-medium text-destructive">{STATUS_META[status].label}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Proteína não sintetizada.</p>
         </div>
       )}
     </section>

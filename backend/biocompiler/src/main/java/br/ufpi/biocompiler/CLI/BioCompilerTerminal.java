@@ -185,16 +185,22 @@ public class BioCompilerTerminal implements CommandLineRunner{
 
     private void showResults(Analysis analysis, int inputNumber){
         System.out.println("========================================");
-        System.out.println(analysis.getSequenceType() == SequenceType.DNA
-            ? "BIOCOMPILER 1.0 - DNA TRANSCRIBER"
-            : "BIOCOMPILER 2.0 - RNA PROCESSOR");
+        if (analysis.getSequenceType() == SequenceType.MATURE_MRNA) {
+            System.out.println("RIBOSSOMO - PROTEIN TRANSLATOR");
+        } else if (analysis.getSequenceType() == SequenceType.PRE_MRNA) {
+            System.out.println("BIOCOMPILER 2.0 - RNA PROCESSOR");
+        } else {
+            System.out.println("BIOCOMPILER 1.0 - DNA TRANSCRIBER");
+        }
         System.out.println("========================================");        
         
         System.out.println("ENTRADA: " + inputNumber);
 
         ResultType resultType = analysis.getResultType();
 
-        if (analysis.getSequenceType() == SequenceType.PRE_MRNA) {
+        if (analysis.getSequenceType() == SequenceType.MATURE_MRNA) {
+            showRibosomeResults(analysis);
+        } else if (analysis.getSequenceType() == SequenceType.PRE_MRNA) {
             showRnaResults(analysis);
         } else if(resultType == ResultType.CORRECT){
             System.out.println("STATUS: CORRETO");
@@ -218,6 +224,23 @@ public class BioCompilerTerminal implements CommandLineRunner{
 
         System.out.println("----------------------------------------");
 
+    }
+
+    private void showRibosomeResults(Analysis analysis) {
+        if (analysis.getResultType() == ResultType.CORRECT) {
+            System.out.println("STATUS: CORRETO");
+            System.out.println("CAP 5': OK");
+            System.out.println("START: AUG - OK");
+            System.out.println("Quadro de leitura: OK");
+            System.out.println("STOP: " + getStopCodon(analysis) + " - OK");
+            System.out.println("Cauda poli-A: 100 A - OK");
+            System.out.println("Tradução: OK");
+            System.out.println("PROTEÍNA: " + getValue(analysis.getProtein(), "NÃO GERADA"));
+        } else {
+            System.out.println("STATUS: ERRO");
+            System.out.println("TIPO: " + getResultMessage(analysis.getResultType()));
+            System.out.println("PROTEÍNA: NÃO GERADA");
+        }
     }
 
     private void showRnaResults(Analysis analysis) {
@@ -281,6 +304,12 @@ public class BioCompilerTerminal implements CommandLineRunner{
                     "BUG - intron incompleto";
             case ALTERNATIVE_SPLICING ->
                     "AMBIGUO - splicing alternativo";
+            case CAP_5_ERROR ->
+                    "BUG - CAP 5'";
+            case POLY_A_ERROR ->
+                    "BUG - cauda poli-A";
+            case READING_FRAME_ERROR ->
+                    "BUG - quadro de leitura";
         };        
     }
 
@@ -295,6 +324,9 @@ public class BioCompilerTerminal implements CommandLineRunner{
         List<Analysis> rnaAnalyses = analyses.stream()
             .filter(analysis -> analysis.getSequenceType() == SequenceType.PRE_MRNA)
             .toList();
+        List<Analysis> ribosomeAnalyses = analyses.stream()
+            .filter(analysis -> analysis.getSequenceType() == SequenceType.MATURE_MRNA)
+            .toList();
 
         if (!dnaAnalyses.isEmpty()) {
             showDnaResume(createCounts(dnaAnalyses), dnaAnalyses.size());
@@ -304,9 +336,30 @@ public class BioCompilerTerminal implements CommandLineRunner{
             showRnaResume(createCounts(rnaAnalyses), rnaAnalyses.size());
         }
 
-        if (!dnaAnalyses.isEmpty() && !rnaAnalyses.isEmpty()) {
+        if (!ribosomeAnalyses.isEmpty()) {
+            showRibosomeResume(createCounts(ribosomeAnalyses), ribosomeAnalyses.size());
+        }
+
+        int activeTypes = (dnaAnalyses.isEmpty() ? 0 : 1) + (rnaAnalyses.isEmpty() ? 0 : 1) + (ribosomeAnalyses.isEmpty() ? 0 : 1);
+        if (activeTypes > 1) {
             System.out.println("TOTAL GERAL: " + analyses.size());
         }
+    }
+
+    private void showRibosomeResume(Map<ResultType, Integer> counts, int total) {
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println("RESUMO RIBOSSOMO - PROTEIN TRANSLATOR");
+        System.out.println("========================================");
+        System.out.printf("CORRETO:                 %d%n", counts.get(ResultType.CORRECT));
+        System.out.printf("BUG - CAP 5':            %d%n", counts.get(ResultType.CAP_5_ERROR));
+        System.out.printf("BUG - START AUSENTE:     %d%n", counts.get(ResultType.START_CODON_NOT_FOUND));
+        System.out.printf("BUG - STOP AUSENTE:      %d%n", counts.get(ResultType.STOP_CODON_NOT_FOUND));
+        System.out.printf("BUG - QUADRO DE LEITURA: %d%n", counts.get(ResultType.READING_FRAME_ERROR));
+        System.out.printf("BUG - CAUDA POLI-A:      %d%n", counts.get(ResultType.POLY_A_ERROR));
+        System.out.println("----------------------------------------");
+        System.out.printf("TOTAL:                   %d%n", total);
+        System.out.println("========================================");
     }
 
     private Map<ResultType, Integer> createCounts(List<Analysis> analyses) {
@@ -438,11 +491,25 @@ public class BioCompilerTerminal implements CommandLineRunner{
             }
 
             try(BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)){
+                boolean hasDna = analyses.stream()
+                    .anyMatch(analysis -> analysis.getSequenceType() == SequenceType.DNA);
                 boolean hasRna = analyses.stream()
                     .anyMatch(analysis -> analysis.getSequenceType() == SequenceType.PRE_MRNA);
-                writer.write(hasRna
-                    ? "linha;status;resultado;mRNA_maduro"
-                    : "linha;status;resultado;pre_mRNA");
+                boolean hasMatureMrna = analyses.stream()
+                    .anyMatch(analysis -> analysis.getSequenceType() == SequenceType.MATURE_MRNA);
+
+                int typeCount = (hasDna ? 1 : 0) + (hasRna ? 1 : 0) + (hasMatureMrna ? 1 : 0);
+                boolean mixedTypes = typeCount > 1;
+
+                if (mixedTypes) {
+                    writer.write("linha;tipo;status;resultado;sequencia_processada");
+                } else if (hasMatureMrna) {
+                    writer.write("linha;status;resultado;proteina");
+                } else if (hasRna) {
+                    writer.write("linha;status;resultado;mRNA_maduro");
+                } else {
+                    writer.write("linha;status;resultado;pre_mRNA");
+                }
                 writer.newLine();
 
                 int line = 1;
@@ -450,17 +517,32 @@ public class BioCompilerTerminal implements CommandLineRunner{
                 for(Analysis analysis : analyses){
                     String status = analysis.getResultType() == ResultType.CORRECT ? "OK"
                         : analysis.getResultType() == ResultType.ALTERNATIVE_SPLICING ? "AMBIGUO" : "ERRO";
-                    String result = getResultMessage(analysis.getResultType());
-                    String processedSequence = analysis.getResultType() == ResultType.CORRECT
-                        ? getValue(
-                            analysis.getSequenceType() == SequenceType.PRE_MRNA
-                                ? analysis.getMatureMrna()
-                                : analysis.getPreMrna(),
-                            "NAO GERADO"
-                        )
-                        : "NAO GERADO";
+                    String result = (analysis.getSequenceType() == SequenceType.MATURE_MRNA && analysis.getResultType() == ResultType.CORRECT)
+                        ? "CORRETO"
+                        : getResultMessage(analysis.getResultType());
 
-                    writer.write(String.format("%d;%s;%s;%s", line, status, result, processedSequence));
+                    String processedSequence;
+                    if (analysis.getSequenceType() == SequenceType.MATURE_MRNA) {
+                        processedSequence = analysis.getResultType() == ResultType.CORRECT
+                            ? getValue(analysis.getProtein(), "NÃO GERADA")
+                            : "NÃO GERADA";
+                    } else {
+                        processedSequence = analysis.getResultType() == ResultType.CORRECT
+                            ? getValue(
+                                analysis.getSequenceType() == SequenceType.PRE_MRNA
+                                    ? analysis.getMatureMrna()
+                                    : analysis.getPreMrna(),
+                                "NAO GERADO"
+                            )
+                            : "NAO GERADO";
+                    }
+
+                    if (mixedTypes) {
+                        String tipo = analysis.getSequenceType() != null ? analysis.getSequenceType().name() : "DNA";
+                        writer.write(String.format("%d;%s;%s;%s;%s", line, tipo, status, result, processedSequence));
+                    } else {
+                        writer.write(String.format("%d;%s;%s;%s", line, status, result, processedSequence));
+                    }
                     writer.newLine();
                     line++;
                 }
