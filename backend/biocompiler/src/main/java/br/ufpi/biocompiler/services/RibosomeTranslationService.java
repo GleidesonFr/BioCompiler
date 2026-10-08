@@ -94,18 +94,15 @@ public class RibosomeTranslationService implements SequenceProcessor {
             return finish(analysis, ResultType.CAP_5_ERROR);
         }
 
-        // 1. Validação da CAP 5' (exatamente "m7Gppp")
         if (!sequence.startsWith(CAP_5)) {
             return finish(analysis, ResultType.CAP_5_ERROR);
         }
 
-        // 2. Validação da cauda poli-A (exatamente 100 adeninas consecutivas na extremidade 3')
         int trailingAs = countTrailingAdenines(sequence);
         if (trailingAs != POLY_A_LENGTH) {
             return finish(analysis, ResultType.POLY_A_ERROR);
         }
 
-        // Extrai a região de RNA entre a CAP 5' e a cauda poli-A
         int rnaEndIndex = sequence.length() - POLY_A_LENGTH;
         if (rnaEndIndex < CAP_5.length()) {
             return finish(analysis, ResultType.POLY_A_ERROR);
@@ -113,12 +110,10 @@ public class RibosomeTranslationService implements SequenceProcessor {
 
         String rna = sequence.substring(CAP_5.length(), rnaEndIndex).toUpperCase();
 
-        // 3. Validação dos caracteres A, U, G, C
         if (!rna.matches("[ACGU]+")) {
             return finish(analysis, ResultType.INVALID_BASE);
         }
 
-        // 4. Localização do primeiro códon AUG (START)
         int startPos = rna.indexOf(START_CODON);
         if (startPos < 0) {
             return finish(analysis, ResultType.START_CODON_NOT_FOUND);
@@ -127,7 +122,6 @@ public class RibosomeTranslationService implements SequenceProcessor {
         analysis.setPositionStart(startPos);
         analysis.setReadingFrame(determineReadingFrame(startPos));
 
-        // 5. Leitura dos códons em trincas na mesma moldura a partir de AUG
         List<String> codons = new ArrayList<>();
         int stopPos = -1;
         String stopCodonFound = null;
@@ -142,7 +136,6 @@ public class RibosomeTranslationService implements SequenceProcessor {
             codons.add(codon);
         }
 
-        // 6. Se encontrou STOP em fase, traduz os códons
         if (stopPos >= 0) {
             analysis.setPositionStop(stopPos);
             String codingRegion = rna.substring(startPos, stopPos + 3);
@@ -156,13 +149,11 @@ public class RibosomeTranslationService implements SequenceProcessor {
             return finish(analysis, ResultType.CORRECT);
         }
 
-        // 7. Se não encontrou STOP em fase, diagnostica entre "quadro de leitura" e "STOP ausente"
         ResultType errorResult = diagnoseStopOrFrameError(rna, startPos);
         return finish(analysis, errorResult);
     }
 
     private ResultType diagnoseStopOrFrameError(String rna, int startPos) {
-        // Encontra todos os códons STOP após o AUG
         int lastStopPos = -1;
         for (String stopCodon : STOP_CODONS) {
             int pos = rna.lastIndexOf(stopCodon);
@@ -171,8 +162,7 @@ public class RibosomeTranslationService implements SequenceProcessor {
             }
         }
 
-        // Se houver um STOP terminal (próximo à extremidade 3', com menos de uma trinca completa após ele)
-        // ou se o caso canônico possuir STOP fora de fase decorrente de perda de moldura:
+
         if (lastStopPos > startPos) {
             int basesAfterStop = rna.length() - (lastStopPos + 3);
             boolean isTerminalStop = basesAfterStop < 3;

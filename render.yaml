@@ -10,26 +10,12 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      - key: DATABASE_HOST
-        fromDatabase:
-          name: biocompiler-db
-          property: host
-      - key: DATABASE_PORT
-        fromDatabase:
-          name: biocompiler-db
-          property: port
-      - key: DATABASE_NAME
-        fromDatabase:
-          name: biocompiler-db
-          property: database
-      - key: DATABASE_USER
-        fromDatabase:
-          name: biocompiler-db
-          property: user
-      - key: DATABASE_PASSWORD
-        fromDatabase:
-          name: biocompiler-db
-          property: password
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
       - key: CORS_ALLOWED_ORIGINS
         fromService:
           type: web
@@ -49,9 +35,3 @@ services:
           type: web
           name: biocompiler-api
           envVarKey: RENDER_EXTERNAL_URL
-
-databases:
-  - name: biocompiler-db
-    plan: free
-    region: oregon
-    postgresMajorVersion: "17"

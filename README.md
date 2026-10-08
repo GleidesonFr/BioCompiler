@@ -18,7 +18,7 @@ O histórico é separado por um `sessionId` UUID salvo no `localStorage` do nave
 frontend/biocompiler/      React, TypeScript, Vite e TanStack Router
 backend/biocompiler/       API Spring Boot, JPA e CLI
 docker-compose.yml          Frontend, backend e PostgreSQL locais
-render.yaml                 Blueprint de deploy no Render
+render.yaml                 Blueprint dos serviços web no Render (banco externo no Neon)
 ```
 
 | Componente | Tecnologia | Porta local |
@@ -220,15 +220,63 @@ npm run lint
 npm run build
 ```
 
-## Deploy no Render
+## Deploy no Render com PostgreSQL Neon
 
-O [render.yaml](render.yaml) cria três recursos na mesma região: `biocompiler-web`, `biocompiler-api` e `biocompiler-db` (PostgreSQL). No painel do Render, crie um **Blueprint**, conecte este repositório e confirme o arquivo.
+O [render.yaml](render.yaml) cria os dois serviços web no Render:
 
-O backend usa as variáveis da base gerenciada e o frontend recebe `VITE_API_BASE_URL` durante o build. O sistema não grava dados no filesystem dos containers: as análises ficam no PostgreSQL. Para manter os dados em longo prazo, mantenha uma instância PostgreSQL ativa; no Render, bancos gratuitos expiram após 30 dias.
+- `biocompiler-api`: API Spring Boot;
+- `biocompiler-web`: frontend TanStack Start.
+
+O PostgreSQL é externo e deve ser criado no [Neon](https://neon.com/). Escolha uma região próxima de Oregon, a região configurada para os serviços Render. Não é necessário importar dados para um deploy novo.
+
+### 1. Criar e obter a conexão do Neon
+
+No painel do Neon, crie o projeto e selecione a opção de conexão **Pooled connection**. O Neon apresenta uma URL semelhante a:
+
+```text
+postgresql://neondb_owner:SENHA@ep-exemplo-pooler.us-west-2.aws.neon.tech/neondb?sslmode=require
+```
+
+Para o Spring Boot, altere somente o protocolo para o formato JDBC:
+
+```text
+jdbc:postgresql://ep-exemplo-pooler.us-west-2.aws.neon.tech/neondb?sslmode=require
+```
+
+O usuário e a senha ficam em variáveis separadas. Não versione credenciais reais.
+
+### 2. Configurar o Blueprint e os segredos
+
+No Render, crie ou sincronize o Blueprint deste repositório. Configure no serviço `biocompiler-api`:
+
+| Variável | Valor |
+| --- | --- |
+| `SPRING_DATASOURCE_URL` | URL JDBC pooled do Neon com `sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | Usuário informado pelo Neon |
+| `SPRING_DATASOURCE_PASSWORD` | Senha informada pelo Neon |
+
+Essas variáveis estão marcadas como `sync: false` no Blueprint. Em um Blueprint novo, o Render solicita os valores durante a criação. Em um Blueprint que já existe, cadastre ou atualize os valores manualmente em **biocompiler-api > Environment**.
+
+As demais ligações continuam automáticas:
+
+- `CORS_ALLOWED_ORIGINS` recebe a URL pública de `biocompiler-web`;
+- `VITE_API_BASE_URL` recebe a URL pública de `biocompiler-api` durante o build do frontend.
+
+### 3. Publicar e validar
+
+1. Publique primeiro `biocompiler-api`.
+2. Confirme que `https://<api>.onrender.com/api/health` responde com sucesso.
+3. No Neon, confirme que a tabela `analyses` foi criada.
+4. Publique `biocompiler-web`.
+5. Crie uma análise, reinicie a API e confirme que o histórico continua disponível.
+
+O perfil de produção usa `spring.jpa.hibernate.ddl-auto=update`; portanto, reiniciar ou republicar a API não remove os registros. O sistema não depende do filesystem efêmero dos containers.
 
 ## Solução de problemas
 
 - **Frontend não alcança a API:** confirme `VITE_API_BASE_URL=http://localhost:8080` em desenvolvimento e que o backend está em execução.
 - **Erro de conexão com o banco:** confirme host, porta, banco, usuário e senha. Com PostgreSQL via Compose, use `localhost:5433` ao executar serviços diretamente na máquina.
+- **Erro de conexão com o Neon:** confirme que `SPRING_DATASOURCE_URL` começa com `jdbc:postgresql://`, usa o host com sufixo `-pooler` e termina com `sslmode=require`; confira também usuário e senha separados.
+- **Blueprint existente não recebeu os segredos:** variáveis `sync: false` novas devem ser preenchidas manualmente no painel do serviço.
 - **Histórico vazio:** confirme que está no mesmo navegador/perfil; o histórico é filtrado pelo `sessionId` salvo no `localStorage`.
 - **Porta ocupada:** altere `BACKEND_PORT`, `FRONTEND_PORT` ou `POSTGRES_PORT` no `.env` e reinicie o Compose.

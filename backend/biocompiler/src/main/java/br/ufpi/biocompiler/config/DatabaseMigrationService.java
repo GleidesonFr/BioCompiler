@@ -6,24 +6,25 @@ import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import br.ufpi.biocompiler.models.ResultType;
-import jakarta.annotation.PostConstruct;
 
 @Component
 @Profile("!terminal")
-public class DatabaseMigrationService {
+public class DatabaseMigrationService implements ApplicationRunner {
     private final JdbcTemplate jdbcTemplate;
 
     public DatabaseMigrationService(DataSource dataSource) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
 
-    @PostConstruct
-    public void migrate() {
+    @Override
+    public void run(ApplicationArguments args) {
         Integer columnCount = jdbcTemplate.queryForObject(
             """
             SELECT COUNT(*)
